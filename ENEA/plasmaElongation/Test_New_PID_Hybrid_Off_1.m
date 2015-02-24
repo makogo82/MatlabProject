@@ -10,10 +10,11 @@ clear all
 %    37870 37869];
 
 shots =         [38591  39091	39092  39094  38629  38628 38627  38404 38616 ];
-shots_time = [ 1.29  0.904   0.8  0.7 0.9855 1.195 1.22      1.12    0.857 ];
+shots_time = [ 0.5  0.5   0.8  0.7 0.9855 1.195 1.22      1.12    0.857 ];
 shots_endtime = [ 1.29  0.904   1.18  1 0.9855 1.195 1.22      1.12    0.857 ];
 
-shot =39092
+shot =38591
+shot = 39091
 Ts = 0.5E-3;
 samplingTime = Ts;
 t_start = shots_time(find(shots==shot));
@@ -55,7 +56,7 @@ rampGainH = 0.00015
 rampGainHdez = 0.001;
 
 %%NEW PARAMETERS
-acceleration_pid_H = 0; %if 1, than the hysteresis for the control is based on the acceleration instead of speed
+acceleration_pid_H = 1; %if 1, than the hysteresis for the control is based on the acceleration instead of speed
 avoid_chattering_PIDH = 10 % number of sampling time instants before the state can switch
 avoid_chattering_PIDH_OFF = 5 % number of sampling time instants before the state can switch
 theta_gain_0 = 0.2;
@@ -83,6 +84,7 @@ qOFF_memo = zeros(length(data.dez),1);
 theta_gains = ones(length(data.dez),1); 
 oscillationDezError_memo = zeros(length(data.dez),1);
 switchCountDError_memo = zeros(length(data.dez),1);
+theta_gains_memo = zeros(length(data.dez),1);
 simula_mymodel = 0;
 
 % A =[   1.01  -0.03138   0.02582
@@ -125,10 +127,9 @@ for j=2:length(mytime)
     switches_counter = switches_counter_memo(j-1);
     switches_counter_OFF = switches_counter_OFF_memo(j-1);
     qOFF = qOFF_memo(j-1);
-    theta_gains = theta_gains(j-1);
     switchCountDError = switchCountDError_memo(j-1);
     oscillationDezError= oscillationDezError_memo(j-1);
-    
+    theta_gains = theta_gains_memo(j-1);
     
     %% CODICE CONTROLLORE in Cpp
     
@@ -262,7 +263,9 @@ for j=2:length(mytime)
             end
             if (qPIDH == qPIDHSwitch || switchCountDError > 100)
                 switchCountDError = 0; %reset
-                oscillationDezError = 0;
+                
+                oscillationDezError = max ( 0, oscillationDezError - 1);
+                
             end
         end
 		    
@@ -287,7 +290,9 @@ for j=2:length(mytime)
     %the gains of xp and xd is reduced by the factor theta_gains
     if(qOFF==1 )
         %the reducing factor is less if acceleration is large 
-        theta_gains = 1.0*min(1.0, abs(dd_error)/(1.5*gammaHpid1)) + (1-min(1.0,abs(dd_error)/(1.5*gammaHpid1)))*theta_gain_0/(1+oscillationDezError);
+        if( abs(xfilterState) < 500 && abs(d_error) < 1E4 )        
+            theta_gains = 1.0*min(1.0, abs(dd_error)/(1.5*gammaHpid1)) + (1-min(1.0,abs(dd_error)/(1.5*gammaHpid1)))*theta_gain_0/(1+oscillationDezError);
+        end
     else
         theta_gains = 1.0;
     end
@@ -338,7 +343,7 @@ for j=2:length(mytime)
     switches_counter_memo(j) = switches_counter;
     switches_counter_OFF_memo(j) = switches_counter_OFF;
     qOFF_memo(j) = qOFF;
-    theta_gains(j) = theta_gains;
+    theta_gains_memo(j) = theta_gains;
     oscillationDezError_memo(j)= oscillationDezError;
     switchCountDError_memo(j) = switchCountDError;
 end
@@ -360,7 +365,12 @@ else
     %%
     figure(1)
     ax(1) = subplot(4,1,1);
-    plot(mytime,data.Hmis,'g',mytime,data.Hcalc,'k-',mytime,xfilterState_memo,'b-',mytime,xpidState_memo,'r-','LineWidth',2)
+    plot(mytime,data.Hmis,'g',...
+         mytime,data.Hcalc,'k-',...
+         mytime,xfilterState_memo,'b-',...
+         mytime,xpidState_memo,'r-',...
+         mytime,xp_memo + xd_memo + integralState_memo,'r:','LineWidth',2);
+     
     legend('ALHmis','ALHcalc','erorr*0.1','PIDnew','Location','SouthWest');
     xlim([t_start,t_end])% -250 250]);
     grid on
@@ -370,10 +380,11 @@ else
     grid on
     ax(2) = subplot(4,1,2);
     plot(mytime,xfilterState_memo,'r',mytime,y,'r:', ...
-        mytime,errorDeazoneH*ones(1,length(d_error_memo)),'g--', ...
+         mytime,errorDeazoneH*ones(1,length(d_error_memo)),'g--', ...
+        mytime,theta_gains_memo*1e3,'k', ...
         mytime,-errorDeazoneH*ones(1,length(d_error_memo)),'g--', 'LineWidth',2)
     %axis([0.1 1.5  -0.2 0.2]);
-    legend('e filtered')   
+    legend('e filtered','y','errorDeazoneH', 'theta_{gains}memo*1E3' , 'Location','NorthWest')   
     xlim([t_start,t_end])% -250 250]);
     grid on
     
@@ -386,7 +397,7 @@ else
     mytime,sigmaHpid2*ones(1,length(d_error_memo)),'g--',...
     mytime,-sigmaHpid2*ones(1,length(d_error_memo)),'g--',...
     mytime,-sigmaHpid1*ones(1,length(d_error_memo)),'k--','LineWidth',2);
-    legend('d error','qPIDH','qSwitch');
+    legend('d error','qPIDH','qSwitch', 'Location','NorthWest');
     grid on
     ylim([sigmaHpid2*6, -sigmaHpid2*6])
     xlim([t_start,t_end])% -250 250]);
@@ -399,7 +410,7 @@ else
     mytime, gammaHpid2*ones(1,length(d_error_memo)),'g--',...
     mytime,-gammaHpid2*ones(1,length(d_error_memo)),'g--',...
     mytime,-gammaHpid1*ones(1,length(d_error_memo)),'k--', 'LineWidth',2);
-    legend('dd error');
+    legend('dd error', 'Location','NorthWest');
     grid on
     ylim([-gammaHpid2*4,gammaHpid2*4])% -250 250]);
     xlim([t_start,t_end])% -250 250]);
