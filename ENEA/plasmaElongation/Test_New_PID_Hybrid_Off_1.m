@@ -387,7 +387,7 @@ else
     mytime,-sigmaHpid1*ones(1,length(d_error_memo)),'k--','LineWidth',2);
     legend('d error','qPIDH','qSwitch');
     grid on
-    ylim([sigmaHpid2*4, -sigmaHpid2*4])
+    ylim([sigmaHpid2*6, -sigmaHpid2*6])
     xlim([t_start,t_end])% -250 250]);
     %axis([0.1 1.5  1.03 1.28]);
      
