@@ -1,0 +1,43 @@
+-----------------------*
+On "terminale neutronica" computer access the three computers (MC1, MC2, MC3) which take GAMMA CAMERA MEASUREMENTS:
+
+machine MC1: password jetjet11 
+ip: 192.107.90.61
+
+machine MC2: jetjet11
+ip: 192.107.90.244
+
+machine MC3: jetjet11
+ip: 192.107.90.245
+
+
+To get the data for each channel, follow the path on each machine:
+Computer/C/acquisizioni/####/ ->folders 1 and 2, 3 and 4, 5 and 6 (according to availability of the gamma signals) are the ones containing the data of the gamma camera channels (the order of the channels is from 1 to 4 from the inside of the tokamak chamber and then 6 and 5 as the outermost channels); copy these folders to your computer to analyse the signals 
+*------------------------
+
+------------------------*
+The website with instructions for installing the program (for DPSD - Digital Pulse Shape Discrimination system) for reading the gamma camera data (loading the binary data files inside the specific channel data folders in Labview environment):
+www.afs.enea.it/basilio/DPSD/  account:bespos pass:pippo
+
+Go to DRIVERS and then SOFTWARE section and install following programs in order to be able to look at the gamma camera data directly in Windows, just by copying the channel folders 1, 2, 3, 4, 5 and 6
+For Win7:
+1. http://www.ni.com/download/ni-daqmx-9.7.5/4240/en/
+2. Labview_Runtime_8.6.zip
+3. DPDS_ENEA1.9.2.zip
+
+-----------
+
+To see the specifics about the gamma camera and its data acquisition look at the MANUALS on that website:
+manual prvi (Manual_DPDS_ENEA_v1.21.pdf): can see the output data file formats (description of the file contents)
+
+*------------------------
+
+------------------------*
+To access the FTU LOGBOOK go to:
+http://efrw01.frascati.enea.it/Online/web/index.php
+
+Here each shot can be selected by shot number or the date of the experiment.
+*------------------------
+
+
+

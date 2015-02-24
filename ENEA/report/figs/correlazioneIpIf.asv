@@ -1,0 +1,163 @@
+clc;clear all;close all;
+typeModel = 2;
+savePlot=false;
+
+Ts = 0.0005; 
+radiusNum=32;
+radiusIntPosition=1.22;
+ts=0;
+ti=0;
+%%
+Sparo=38864;   
+temp1 = CleanFTUdataLOCAL_v4(ti,.7,Ts,Sparo,radiusNum,radiusIntPosition);
+%graficoIpIfDezDep(temp1,Sparo);
+Sparo=38865;   
+temp2 = CleanFTUdataLOCAL_v4(ti,.6,Ts,Sparo,radiusNum,radiusIntPosition);
+%graficoIpIfDezDep(temp2,Sparo);
+Sparo=38869;   
+temp3 = CleanFTUdataLOCAL_v4(ti,1.3,Ts,Sparo,radiusNum,radiusIntPosition);
+%graficoIpIfDezDep(temp3,Sparo);
+Sparo=38519;   
+temp4 = CleanFTUdataLOCAL_v4(ti,0.3,Ts,Sparo,radiusNum,radiusIntPosition);
+%graficoIpIfDezDep(temp3,Sparo);
+Sparo=38513;   
+temp5 = CleanFTUdataLOCAL_v4(ti,0.3,Ts,Sparo,radiusNum,radiusIntPosition);
+%graficoIpIfDezDep(temp3,Sparo);
+Sparo=38863;   
+temp6 = CleanFTUdataLOCAL_v4(ti,1.7,Ts,Sparo,radiusNum,radiusIntPosition);
+%graficoIpIfDezDep(temp3,Sparo);
+
+
+%% rapporto If/Ip
+figure('Name','If/Ip');
+subplot(3,1,1)
+plot(temp1.mytime,temp1.IPLmis, temp2.mytime, temp2.IPLmis, temp3.mytime, temp3.IPLmis,'LineWidth',2); grid on;
+grid on; legend('Ip 38864','Ip 38865','Ip 38869');
+xlabel('tempo[s]','interpreter','latex','fontsize',12);
+ylabel('[$A$]','interpreter','latex','fontsize',12);
+title('Plasma current');
+subplot(3,1,2)
+plot(temp1.mytime,temp1.Ihm, temp2.mytime, temp2.Ihm, temp3.mytime, temp3.Ihm,'LineWidth',2); grid on;
+grid on; legend('Ip 38864','Ip 38865','Ip 38869');
+xlabel('tempo[s]','interpreter','latex','fontsize',12);
+%ylim([-0.1 0.1]);
+ylabel('','interpreter','latex','fontsize',12);
+title('Ihm');
+subplot(3,1,3)
+plot(temp1.mytime,abs(temp1.Ifm./temp1.IPLmis), temp2.mytime, abs(temp2.Ifm./temp2.IPLmis), temp3.mytime, abs(temp3.Ifm./temp3.IPLmis),'LineWidth',2); grid on;
+grid on; legend('Ip 38864','Ip 38865','Ip 38869');
+xlabel('tempo[s]','interpreter','latex','fontsize',12);
+ylim([-0.1 0.5]);
+ylabel('','interpreter','latex','fontsize',12);
+title('I_F/I_P');
+
+%% rapporto If/Ip
+figure('Name','If/Ip bis');
+subplot(3,1,1)
+plot(temp4.mytime,temp4.IPLmis, temp5.mytime, temp5.IPLmis,'LineWidth',2); grid on;
+grid on; legend('Ip 38519','Ip 38513');
+xlabel('tempo[s]','interpreter','latex','fontsize',12);
+ylabel('[$A$]','interpreter','latex','fontsize',12);
+title('Plasma current');
+subplot(3,1,2)
+plot(temp4.mytime,temp4.Ihm, temp5.mytime, temp5.Ihm,'LineWidth',2); grid on;
+grid on; legend('Ih 38519','Ih 38519');
+xlabel('tempo[s]','interpreter','latex','fontsize',12);
+%ylim([-0.1 0.1]);
+ylabel('','interpreter','latex','fontsize',12);
+title('Ihm');
+subplot(3,1,3)
+plot(temp4.mytime,abs(temp4.Ifm./temp4.IPLmis), temp5.mytime, abs(temp5.Ifm./temp5.IPLmis), 'LineWidth',2); grid on;
+grid on; legend('Ip 38519','Ip 38513');
+xlabel('tempo[s]','interpreter','latex','fontsize',12);
+ylim([-0.04 0.3]);
+ylabel('','interpreter','latex','fontsize',12);
+title('I_F/I_P');
+
+%% rapporto If/Ip
+% figure('Name','If/Ip normal discharge');
+% subplot(2,1,1)
+% plot(temp6.mytime,temp6.IPLmis,'LineWidth',2); grid on;
+% grid on; legend('Ip 38864');
+% xlabel('tempo[s]','interpreter','latex','fontsize',12);
+% ylabel('[$A$]','interpreter','latex','fontsize',12);
+% title('Plasma current');
+% title('I_F/I_P');
+% subplot(2,1,2)
+% plot(temp6.mytime,abs(temp6.Ifm./temp6.IPLmis), 'LineWidth',2); grid on;
+% grid on; legend('Ip 38864');
+% xlabel('tempo[s]','interpreter','latex','fontsize',12);
+% ylim([-0.04 0.2]);
+% ylabel('','interpreter','latex','fontsize',12);
+% title('I_F/I_P');
+
+%%
+% figure('Name','rs2');
+% plot(temp1.mytime,temp1.rs2, temp2.mytime, temp2.rs2, temp3.mytime, temp3.rs2,'LineWidth',2); grid on;
+% grid on; legend('Ip 38864','Ip 38865','Ip 38869');
+% xlabel('tempo[s]','interpreter','latex','fontsize',12);
+% ylabel('[$A$]','interpreter','latex','fontsize',12);
+% title('Plasma current.');
+% %%
+% figure('Name','Sparo 38864')
+% subplot(4,1,1)
+% plot(temp1.mytime,temp1.IPLmis, 'LineWidth',2); grid on;
+% grid on; legend('Ip 38864','Ip 38865','Ip 38869');
+% xlabel('tempo[s]','interpreter','latex','fontsize',12);
+% ylabel('[$A$]','interpreter','latex','fontsize',12);
+% title('Plasma current.');
+% subplot(4,1,2)
+% plot(temp1.mytime,temp1.Ifm, 'LineWidth',2); grid on;
+% grid on; legend('Ip 38864','Ip 38865','Ip 38869');
+% xlabel('tempo[s]','interpreter','latex','fontsize',12);
+% ylabel('[$A$]','interpreter','latex','fontsize',12);
+% title('Plasma current.');
+% subplot(4,1,3)
+% plot(temp1.mytime,temp1.dIfm, 'LineWidth',2); grid on;
+% grid on; legend('DIf 38864');
+% xlabel('tempo[s]','interpreter','latex','fontsize',12);
+% ylabel('[$\frac{A}{s}$]','interpreter','latex','fontsize',12);
+% title('dIfm');
+% subplot(4,1,4)
+% plot(temp1.mytime,temp1.Ivm, 'LineWidth',2); grid on;
+% grid on; legend('DIf 38864');
+% xlabel('tempo[s]','interpreter','latex','fontsize',12);
+% ylabel('[$\frac{A}{s}$]','interpreter','latex','fontsize',12);
+% title('dIfm');
+
+%%
+
+%%
+
+%%
+
+% figure('Name','current');
+% subplot(2,1,1)
+% plot(temp1.mytime,temp1.IPLmis, temp2.mytime, temp2.IPLmis, temp3.mytime, temp3.IPLmis,'LineWidth',2); grid on;
+% grid on; legend('Ip 38864','Ip 38865','Ip 38869');
+% xlabel('tempo[s]','interpreter','latex','fontsize',12);
+% ylabel('[$A$]','interpreter','latex','fontsize',12);
+% title('Plasma current.');
+% subplot(2,1,2)
+% plot(temp1.mytime, temp1.Ifm,temp2.mytime, temp2.Ifm,temp3.mytime, temp3.Ifm,'LineWidth',2); grid on;
+% grid on; legend('If 38864 ','If 38865','If 38869');
+% xlabel('tempo[s]','interpreter','latex','fontsize',12);
+% ylabel('[$A$]','interpreter','latex','fontsize',12);
+% title('IF current.');
+% 
+% 
+% figure('Name','diffCurrent');
+% subplot(2,1,1)
+% plot(temp1.mytime,temp1.dIpm, temp2.mytime, temp2.dIpm, temp3.mytime, temp3.dIpm,'LineWidth',2); grid on;
+% grid on; legend('Ip 38864','Ip 38865','Ip 38869');
+% xlabel('tempo[s]','interpreter','latex','fontsize',12);
+% ylabel('[$A$]','interpreter','latex','fontsize',12);
+% title('Plasma current.');
+% subplot(2,1,2)
+% plot(temp1.mytime, temp1.dIfm,temp2.mytime, temp2.dIfm,temp3.mytime, temp3.dIfm,'LineWidth',2); grid on;
+% grid on; legend('If 38864 ','If 38865','If 38869');
+% xlabel('tempo[s]','interpreter','latex','fontsize',12);
+% ylabel('[$A$]','interpreter','latex','fontsize',12);
+% title('IF current.');
+
+
