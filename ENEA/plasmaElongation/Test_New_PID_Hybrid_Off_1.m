@@ -9,12 +9,15 @@ clear all
 %    38592 38591 38411 38410 38409 38404 38298 37930 37931 37932 ...
 %    37870 37869];
 
-shots =         [38591  39091	39092  39094  38629  38628 38627  38404 38616 ];
-shots_time = [ 0.5  0.5   0.8  0.7 0.9855 1.195 1.22      1.12    0.857 ];
-shots_endtime = [ 1.29  0.904   1.18  1 0.9855 1.195 1.22      1.12    0.857 ];
+shots =         [38591  39091	39092  39094  38629  38628   38627   38404   38616 ];
+shots_time =    [ 0.5     0.5     0.8  0.7   0.5     1.195   0.7     0.2     0.3   ];
+shots_endtime = [ 1.29  0.904    1.18  1     0.9855  1.195   1.22    1.2     0.9 ];
 
 shot =38591
-shot = 39091
+%shot = 39091
+shot = 39092
+shot = 38404
+
 Ts = 0.5E-3;
 samplingTime = Ts;
 t_start = shots_time(find(shots==shot));
@@ -54,7 +57,8 @@ maxSatH = 300.0;     %130
 errorDeazoneH = 90.0; %250
 rampGainH = 0.00015
 rampGainHdez = 0.001;
-
+qOFFPositionThreshold = 500
+qOFFVelocityThreshold = 200000
 %%NEW PARAMETERS
 acceleration_pid_H = 1; %if 1, than the hysteresis for the control is based on the acceleration instead of speed
 avoid_chattering_PIDH = 10 % number of sampling time instants before the state can switch
@@ -290,7 +294,7 @@ for j=2:length(mytime)
     %the gains of xp and xd is reduced by the factor theta_gains
     if(qOFF==1 )
         %the reducing factor is less if acceleration is large 
-        if( abs(xfilterState) < 500 && abs(d_error) < 1E4 )        
+        if( abs(xfilterState) < qOFFPositionThreshold  && abs(d_error) < qOFFVelocityThreshold )        
             theta_gains = 1.0*min(1.0, abs(dd_error)/(1.5*gammaHpid1)) + (1-min(1.0,abs(dd_error)/(1.5*gammaHpid1)))*theta_gain_0/(1+oscillationDezError);
         end
     else
@@ -371,7 +375,7 @@ else
          mytime,xpidState_memo,'r-',...
          mytime,xp_memo + xd_memo + integralState_memo,'r:','LineWidth',2);
      
-    legend('ALHmis','ALHcalc','erorr*0.1','PIDnew','Location','SouthWest');
+    legend('ALHmis','ALHcalc','erorr*0.1','PIDnew','xp+xd+xi','Location','SouthWest');
     xlim([t_start,t_end])% -250 250]);
     grid on
     title(num2str(shot));
@@ -458,4 +462,31 @@ else
     title(num2str(shot));
     %%
 
+end
+
+%%
+
+shots =         [38591  39091	39092  39094  38629  38628   38627   38404   38616 ];
+shots_time =    [ 0.5     0.5     0.8  0.7   0.5     1.195   0.7     0.2     0.3   ];
+shots_endtime = [ 1.29  0.904    1.18  1     0.9855  1.195   1.22    1.2     0.9 ];
+
+for i=1:length(shots)
+    shot=shots(i);
+    Ts = 0.5E-3;
+    samplingTime = Ts;
+    t_start = shots_time(find(shots==shot));
+    t_end = shots_endtime(find(shots==shot));
+    data = CleanFTUdata_v6(t_start,t_end,Ts,shot,1);
+
+    figure('Name',strcat('Sparo', num2str(shot)));
+    as(1)=subplot(2,1,1);
+    plot(mytime,data.Hcalc,'g','LineWidth',2);
+    grid on; 
+    as(2)=subplot(2,1,2);
+    plot(mytime,-data.dez,'LineWidth',2); 
+    legend('Hmis','Hcalc','dez')
+    grid on
+    title(num2str(shot));
+    linkaxes(as,'x');
+    
 end
