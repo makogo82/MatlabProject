@@ -3,7 +3,7 @@ clc;
 clear all;
 shots =         [38609 38591  39091	39092  39094  38629  38628   38627   38404  38616 ];
 shots_time =    [0.1 0.1    0.1     0.1  0.1   0.1     0.1     0.1     0.1     0.5   ];
-shots_endtime = [1.1 1.35     1     1.2  1     0.9855  1.195   1.22    1.2     0.9 ];
+shots_endtime = [1.1 1.35     1     1.2  1     0.9855  1.195   1.22    1.122     0.856 ];
 c_dez = 2;
 d_dez = 9;
 c_ddez = 2;
@@ -17,25 +17,22 @@ for i=1:length(shots)
     data = CleanFTUdata_v6(t_start,t_end,Ts,shot,1);
     mytime = data.time;
     figure('Name',strcat('Shot', num2str(shot)));
-    as(1)=subplot(5,1,1);
-    plot(mytime,data.Hmis,'g',mytime,data.Hcalc,'k',mytime,data.Fmis,mytime,data.Fcalc,'LineWidth',2);
+    as(1)=subplot(4,1,1);
+    plot(mytime,data.Hmis,'g',mytime,data.Hcalc,'k','LineWidth',2);
     legend('Hmis','Hcalc','Fmis','Fcalc')
     grid on; 
-    as(2)=subplot(5,1,2);    
+    as(2)=subplot(4,1,2);    
     d_error = mypseudo_derivative(mytime,data.dez,c_dez,d_dez);
     dd_error = mypseudo_derivative(mytime,d_error,c_ddez,d_ddez);
     plot(mytime,data.dez,'LineWidth',2); 
     legend('dez','Location','NorthWest')
     grid on;
-    as(3)=subplot(5,1,3);
-    plot(mytime,d_error,'LineWidth',2); 
+    as(3)=subplot(4,1,3);
+    plot(mytime,data.Vmis,'g',mytime,data.Vcalc,'k',mytime,data.Fmis,mytime,data.Fcalc,'LineWidth',2);
+ 
     legend('d_error','Location','NorthWest')
     grid on;
-    as(4)=subplot(5,1,4);
-    plot(mytime,dd_error,'LineWidth',2); 
-    legend('dd_error','Location','NorthWest')
-    grid on;
-    as(5)=subplot(5,1,5);
+    as(5)=subplot(4,1,4);
     plot(mytime,data.IPLmis,'LineWidth',2);
     grid on; 
     title(num2str(shot));

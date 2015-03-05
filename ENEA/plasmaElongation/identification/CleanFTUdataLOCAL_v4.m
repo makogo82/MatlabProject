@@ -5,7 +5,7 @@ globalVar;
 
 disp(strcat('ELABORAZIONE SHOT: ', num2str(shot)));
 
-tempus = load([ '..\shot_' num2str(shot) '.mat']);
+tempus = load([ 'C:\shot\shot_' num2str(shot) '.mat']);
 
 DATA = tempus.Data;
 
@@ -536,9 +536,14 @@ Data.myZS1prep = Data.ZS1prep;
 Data.vloop = Data.vloop;
 Data.neutrnfc144=Data.neutrnfc144;
 
-Data.inputIddData=[Data.IPLmis' Data.Hmis' Data.Vmis'];
+Data.inputIddData=[Data.IPLmis' Data.Hmis' Data.Fmis' Data.zs1' Data.zs2'];
 Data.outputIddData=[Data.dez'];
+
 zIddData = iddata(Data.outputIddData, Data.inputIddData , (Data.mytime(2)-Data.mytime(1)), 'Name', strcat(['Identificazione HCoil t_{plateau}=[',num2str(t_i),'-',num2str(t_f),']. Utilizzo segnale FC SHOT: ', num2str(shot)]));
+zIddData.una  = {'IP','IHmis','IFmis','zs1','zs2'}
+zIddData.yna  = {'dez'}
+set(zIddData,'TimeUnit','second');
+
 zIddDataSim = iddata([], Data.inputIddData , (Data.mytime(2)-Data.mytime(1)), 'Name', 'H coil');
 Data.zIddDataSim=zIddDataSim;
 Data.zIddData=zIddData;
