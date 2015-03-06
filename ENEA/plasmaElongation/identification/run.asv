@@ -59,7 +59,6 @@ z = merge(z1); %multiexperiment
 %identificazione del modello
 display('Start Identification');
 modelId = pem(z, model);
-pause
 param = getpar(modelId,'Value')
 %%
 compare(modelId,z);

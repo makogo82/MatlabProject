@@ -12,9 +12,9 @@ IP = u(1);
 % tengo conto dell'effetto fi F
 dx1 = x(2);
 b_pl = (zs1-zs2)/2;
-xV = 1.5*x(1);%+b_pl;
+xV = x(1);
 
-%EFFETTO DOVUTO A IH e IP 
+%EFFETTO DOVUTO A IH
 f_IH_IP = p1*IP*IH*( 1 / (p2-xV) - 1 / (-p2-xV) );
 
 %EFFETTO DOVUTO A IF
