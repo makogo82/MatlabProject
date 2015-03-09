@@ -13,7 +13,7 @@ shots =         [38591  39091   39092  39094  38629  38628 38627  38404  38616 3
 shots_time = [    0.2   0.5     0.2    0.2    0.5    0.2   0.2    0.2    0.2   0.2 ];
 shots_endtime = [ 1.29  0.904   1.15   1      0.99 1.195 1.22   1.12   0.857   1.6];
  
-shot =38628
+shot =38627
 Ts = 0.5E-3;
 samplingTime = Ts;
 t_start = shots_time(find(shots==shot));

@@ -1,27 +1,27 @@
 clc 
-%close all
+close all
 clear all
  
 %% Shots for IDENTIFICATION
-% FTU elongated    
-%shots =  [39091    39092   39094 ...
-%    38629 38628 38627 38616 38615 38614 38613 38612 38611 38610 38609 ...
-%    38592 38591 38411 38410 38409 38404 38298 37930 37931 37932 ...
-%    37870 37869];
+
  
-shots =         [38591  39091   39092  39094  38629  38628 38627  38404  38616 38615];
-shots_time = [    0.2   0.5     0.2    0.2    0.5    0.2   0.2    0.2    0.2   0.2 ];
-shots_endtime = [ 1.29  0.904   1.15   1      0.99 1.195 1.22   1.12   0.857   1.6];
+shots =         [39091   39092  39094  38629  38628 38627  38404  38616 ];
+shots_time =    [0.8    0.8    0.85    0.5    0.5     1.14    0.8    0.7 ];
+shots_endtime = [0.904   1.14   1      0.985 1.195   1.22   1.178   0.9 ];
  
-shot =39092
+for h=1:length(shots)
+
+shot =shots(h);
 Ts = 0.5E-3;
 samplingTime = Ts;
+
 t_start = shots_time(find(shots==shot));
 t_end = shots_endtime(find(shots==shot));
 data = CleanFTUdata_v6(t_start,t_end,Ts,shot,1);
 mytime = data.time;
-%figure('Name','IPL')
-%plot(mytime,data.IPLmis);
+
+shots_time(h)= mytime(find(data.Fmis<-6000,1));
+
 %% Simulation
 tau_filter = 0.7; %0.75
 c_dez = 2;
@@ -384,155 +384,84 @@ end
  
 if(simula_mymodel==1)
     
-    figure(1)
-    ax(1) = subplot(2,1,1);
-    plot(mytime,data.Hcalc,'b',mytime,data.Hmis,'r',mytime,modello_amplificatore_memo(:,1),'r--','LineWidth',2);%,mytime,xpid_test,'r');
-    title(num2str(shot))
-    grid on
-    legend('ALHcalc','ALHmis','Estimated','Location','SouthWest');
-    ax(2) = subplot(2,1,2);
-    plot(mytime,data.dez,'r',mytime,modello_simulato_memo(:,1),'r--','LineWidth',2);
-    grid on
-    ylim([-0.2,0.2]);
-    legend('data.dez','Estimated','Location','SouthWest');
-    linkaxes(ax,'x');
-    %%
-    A = [0  1 0; 0 0 1; 0 0 0];
-    rho = 1000;
-    K = [3*rho; 3*rho^2; 1*rho^3];
-    %eig(A-K*[1,0,0])
-    XX = zeros(length(mytime),3);
-    for i=2:length(mytime)
-        XX(i,:) = XX(i-1,:) + Ts*(A*XX(i-1,:)' + K*(xfilterState_memo(i-1)-XX(i-1,1)))';
-    end    
-    %%
-    figure(2)
+    figure('Name',strcat('Shot', num2str(shot)));
+   
     %c1 = a_3*data.IPLmis'./abs(0.8-abs(modello_simulato_memo(:,1))).*uu_memo;
+    c_2H = 1.7E-5;
+    c_2L = 0.3E-5;
     c_2 = 1E-5;
     c_3 = 0.8;
-    b_pl = 0.29;% (data.zs1-data.zs2)/2.0;
-    t1 = c_2*data.IPLmis'.*(1./(c_3-(data.dez+b_pl)) - 1./(-c_3-(data.dez+b_pl)) )'.*data.Hmis';
-    c_4 = c_2*0.001;
-    c_5 = 0.4;
-    t2 = -c_4*data.Fmis'.*data.IPLmis'.*( 1./(c_5-(data.dez+b_pl)) + 1./(-c_5-(data.dez+b_pl)) )';
-    %acc_int = lsim(tf([1],[1 0]),(t2+t1),mytime);
+    b_pl = 0;%0.29;%(data.zs1-data.zs2)/2.0;
+    t1 =  c_2*data.IPLmis'.*data.Hmis'.*(1./(c_3-1.5*(data.dez+b_pl)) - 1./(-c_3-1.5*(data.dez+b_pl)) )';    
+    t1H = c_2H*data.IPLmis'.*data.Hmis'.*(1./(c_3-1.5*(data.dez+b_pl)) - 1./(-c_3-1.5*(data.dez+b_pl)) )';
+    t1L = c_2L*data.IPLmis'.*data.Hmis'.*(1./(c_3-1.5*(data.dez+b_pl)) - 1./(-c_3-1.5*(data.dez+b_pl)) )';
     
+    c_4 = c_2*0.001;
+    c_5 = 0.4;    
+    b_pl = 0;
+    t2 = -c_4*data.Fmis'.*data.IPLmis'.*(2*( 1./(c_5-1.5*(data.dez+b_pl)) + 1./(-c_5-1.5*(data.dez+b_pl)))).^2';
+    c_6 = 1500;
+    c_7 = 0.12;
+    mydead = zeros(length(mytime),1);
+    for i=1:length(mytime)
+        if(abs(1.5*data.dez(i))>= c_7)
+            mydead(i) = 1.5*data.dez(i)-sign(data.dez(i))*c_7;
+        else
+            mydead(i) = 0;
+        end
+    end
+    t3 = -(c_6*mydead).^1.2;
+    %acc_int = lsim(tf([1],[1 0]),(t2+t1),mytime);
     ax(1) = subplot(2,1,1);
-    plot(mytime, t1,'r',mytime, t2,'b',mytime,t1+t2,'g--',...%mytime,acc_int,'k--',...
-        mytime,dd_error_memo*(((1.5e-4) * (-1.0))),'k',mytime,XX(:,3)*(((1.5e-4) * (-1.0))),'k:','LineWidth',2);
-    grid on
-    ylim([-3000, 3000]);
-    title(num2str(shot))
-    legend('c1','c2','c1+c2','dde','location','SouthWest');
+    plot( mytime,t1,mytime,t2,...
+          mytime,t1+t2+t3,...
+          mytime,t1H+t2+t3,...
+          mytime,t1L+t2+t3,...
+          mytime,dd_error_memo*(((1.5e-4) * (-1.0))),'b-.','LineWidth',2);
+      grid on;
+      legend('t1','t2','t1+t2+t3','t1H','t1L','dd_dez','location','SouthWest');
+      xlim([shots_time(h), shots_endtime(h)]);
+      ylim([-1500, 1500]);
     ax(2) = subplot(2,1,2);
-    plot(mytime,d_error_memo,'lineWidth',2);
-    grid on
+    
+    xlim([shots_time(h), shots_endtime(h)]);
+    ylim([-1000, 1000]);
+    title(num2str(shot))
+    plot( mytime,data.Fmis*1e-2,mytime,data.Hmis,'LineWidth',2);
+    grid on;  
+    legend('IFmis1E-2','IHmis')
+       
+
+    
     linkaxes(ax,'x');
     
-    figure(3)
-    ax(1) = subplot(4,1,1);
-    plot(mytime,xfilterState_memo,'m-',mytime,XX(:,1),'m:',mytime,data.Hmis,'b',...
+    figure('Name',strcat('Dez Shot', num2str(shot)));
+    ax2(1) = subplot(4,1,1);
+    plot(mytime,xfilterState_memo,'m-',mytime,data.Hmis,'b',...
          mytime,data.Hcalc,'g--',mytime,xpidState_memo,'k--','LineWidth',2);
     title(num2str(shot))
     grid on
     legend('error','e estimate', 'Location','SouthWest');
-    ax(2) = subplot(4,1,2);
-    plot(mytime,d_error_memo,'b-',mytime,XX(:,2),'b:','LineWidth',2);
+    ax2(2) = subplot(4,1,2);
+    plot(mytime,d_error_memo,'b-','LineWidth',2);
     grid on
     legend('d error','d estimate''Location','SouthWest');
-    ax(3) = subplot(4,1,3);
-    plot(mytime,dd_error_memo,'k-',mytime,XX(:,3),'k:','LineWidth',2);
+    ax2(3) = subplot(4,1,3);
+    plot(mytime,dd_error_memo,'k-','LineWidth',2);
     grid on
     legend('dd error','dd estimate','Location','SouthWest');
-    ax(4) = subplot(4,1,4);
+    ax2(4) = subplot(4,1,4);
     plot(mytime,data.Fmis,'c-','LineWidth',2);
     grid on
     legend('I_F','Location','SouthWest');
     
-    linkaxes(ax,'x');
-   
+    linkaxes(ax2,'x');
+    
+    
+
 else
-    
-    %%
-    figure(1)
-    ax(1) = subplot(4,1,1);
-    plot(mytime,data.Hmis,'g',mytime,data.Hcalc,'k-',mytime,xfilterState_memo,'b-',mytime,xpidState_memo,'r-','LineWidth',2)
-    legend('ALHmis','ALHcalc','erorr fit','PIDnew','Location','SouthWest');
-    xlim([mytime(1),mytime(end)])% -250 250]);
-    grid on
-    title(num2str(shot));
-   
-    
-    
-    grid on
-    ax(2) = subplot(4,1,2);
-    plot(mytime,xfilterState_memo,'r',mytime,y,'r:', ...
-        mytime,errorDeazoneH*ones(1,length(d_error_memo)),'g--', ...
-        mytime,-errorDeazoneH*ones(1,length(d_error_memo)),'g--', 'LineWidth',2)
-    %axis([0.1 1.5  -0.2 0.2]);
-    legend('e filtered')   
-    xlim([mytime(1),mytime(end)])
-    grid on
-    
-    ax(3) = subplot(4,1,3);
-    plot(mytime,d_error_memo,'b',mytime,qPIDH_memo*10000,'r',mytime,qOFF_memo*10000,'c-' , ...
-        mytime,theta_gains_memo*10000,'m',mytime,sigmaHpid1*ones(1,length(d_error_memo)),'k--',...
-    mytime,sigmaHpid2*ones(1,length(d_error_memo)),'g--',...
-    mytime,-sigmaHpid2*ones(1,length(d_error_memo)),'g--',...
-    mytime,-sigmaHpid1*ones(1,length(d_error_memo)),'k--','LineWidth',2);
-    legend('d error','qPIDH','qOFF','qBouncing');
-    grid on
-    xlim([mytime(1),mytime(end)])
-    %axis([0.1 1.5  1.03 1.28]);
-     
-    ax(4) = subplot(4,1,4);
-    plot(mytime,dd_error_memo,'b',mytime,gammaHpid1*ones(1,length(d_error_memo)),'k--',...
-    mytime,gammaHpid2*ones(1,length(d_error_memo)),'g--',...
-    mytime,-gammaHpid2*ones(1,length(d_error_memo)),'g--',...
-    mytime,-gammaHpid1*ones(1,length(d_error_memo)),'k--', 'LineWidth',2);
-    legend('dd error');
-    grid on
-    xlim([mytime(1),mytime(end)])
-    
-    linkaxes(ax,'x');
-    hold off
-    %%
-    figure(2)
-    plot(mytime,xp_memo,'b:',mytime,xd_memo,'b--',mytime,integralState_memo,'b',...
-         mytime,xpidState_memo,'r',mytime,xp_memo+xd_memo+integralState_memo,'k',...
-         mytime,xfilterState_memo,'g',mytime,data.Hcalc,'c',mytime,data.Hmis,'c--','LineWidth',2)
-    legend('xp','xd','xi','new','PID','error f','Hcalc','Hmis','Location','SouthWest');%,'FontSize',18)
-    grid on
-    title(num2str(shot));
-    %%
-    figure(3)
-    theta0 = 1.2E-1;
-    theta1 = 0.8;
-    theta2 = 0;
-    tau = 0.003;
-    tau1 = 0.004;
-    luky = theta2*error'-theta0*data.IPLmis./(theta1-abs(data.zs1+data.zs2)).*data.Hmis;
-    plot(mytime,lsim(tf([1 0 0],[tau^2 2*tau 1]),error_memo,mytime),'b',mytime,luky,'r-',...
-         mytime,lsim(tf([1],[ tau1 1]),luky,mytime),'k','LineWidth',2)
-    legend('dd_error','luky','Location','SouthWest')
-    grid on
-    title(num2str(shot));
-    %%
-    figure(4)
-    
-    omega_z = 2*pi*60;
-    zita = 0.2;
-    s = tf([1 0],[1]);
-    Ttau = 0.006;
-    omega_p = 2*pi*120;
-    zita_p = 0.7;
-    Ttau_p = 0.00;
-    plot(mytime,data.Hmis,'r-',mytime,data.Hcalc,'b-',...
-         mytime,lsim(exp(-s*Ttau)*tf([1],[1/omega_z^2 2*zita/omega_z 1]),data.Hcalc,mytime),'k',...
-         mytime,error_memo*0.4,'g',mytime,1.4*lsim(exp(-s*Ttau_p)*tf([1],[1/omega_p^2 2*zita_p/omega_p 1]),data.Hcalc,mytime),'g--', 'LineWidth',2)
-    legend('Hmis','Hcalc','Hstimato','error','Location','SouthWest')
-    grid on
-    title(num2str(shot));
-    %%
+  
  
+end
+
 end

@@ -10,10 +10,10 @@ clear all
 %    37870 37869];
  
 shots =         [38591  39091   39092  39094  38629  38628 38627  38404  38616 38615];
-shots_time = [    0.2   0.1     0.2    0.2    0.85    0.2   0.2    0.2    0.1   0.2 ];
+shots_time = [    0.2   0.1     0.2    0.2    0.85    0.2   0.5    0.2    0.1   0.2 ];
 shots_endtime = [ 1.29  0.904   1.14   1      0.985 1.195   1.22   1.178  0.9  1.6];
  
-shot =39092;
+shot =38627;
 Ts = 0.5E-3;
 samplingTime = Ts;
 t_start = shots_time(find(shots==shot));
@@ -436,18 +436,23 @@ if(simula_mymodel==1)
     end
     t3 = -(c_6*mydead).^1.2;
     %acc_int = lsim(tf([1],[1 0]),(t2+t1),mytime);
-    
+    ax(1) = subplot(2,1,1);
     plot( mytime,t1,mytime,t2,...
           mytime,t1+t2+t3,...
           mytime,t1H+t2+t3,...
           mytime,t1L+t2+t3,...
           mytime,dd_error_memo*(((1.5e-4) * (-1.0))),'b-.','LineWidth',2);
-      
-    grid on
-   % xlim([0.5, 1.15]);
+      grid on;
+      legend('t1','t2','t1+t2+t3','t1H','t1L','dd_dez','location','SouthWest');
+    ax(2) = subplot(2,1,2);
+    
+    %xlim([0.5, 1.15]);
     ylim([-1000, 1000]);
     title(num2str(shot))
-    legend('t1','t2','t1+t2+t3','t1H','t1L','dd_dez','location','SouthWest');
+    plot( mytime,data.Fmis*1e-2,mytime,data.Hmis,'LineWidth',2);
+    grid on;  
+    legend('IFmis1E-2','IHmis')
+    
 
     
 
