@@ -1,0 +1,15 @@
+%% DOCUMENT TITLE
+% INTRODUCTORY TEXT
+%%
+%% SECTION TITLE
+% DESCRIPTIVE TEXT
+
+function [t1 ,t2 ] = verticalModel( x1 ,  c_2, c_3 , c_4 , c_5  )
+ 
+
+t1 =   c_2*IPLmis*Hmis*(1/(c_3-1.5*(x1))    - 1/(-c_3-1.5*(x1)) );
+t2 =  -c_4*Fmis*IPLmis*(2*( 1/(c_5-1.5*(x1)) + 1/(-c_5-1.5*(x1))))^2;
+
+
+end
+

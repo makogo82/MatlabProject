@@ -1,8 +1,4 @@
-function Data = CleanFTUdata_v6(t_i, t_f, Ts, shot, local ) 
-
-
-
-
+function Data = CleanFTUdata_v6(t_i, t_f, Ts, shot, local, c_dez, d_dez , c_dez, d_dez ) 
 
 %% t_i : initial time
 %  t_f : final time
@@ -176,13 +172,8 @@ temp = DATA.DEZ;
 Data.dez = interp1(temp.x,temp.y,new_time);
 Data.names.dez = 'DEZ, flux vertical position error';
 
-c_dez = 2;
-d_dez = 9;
-c_ddez = 2;
-d_ddez = 10;
-
-Data.d_dez  = mypseudo_derivative(new_time,Data.dez,    c_dez, d_dez);
-Data.dd_dez = mypseudo_derivative(new_time,Data.d_dez, c_ddez, d_ddez);
+Data.d_dez  = mypseudo_derivative(new_time,Data.dez,   c_d_dez,d_d_dez);
+Data.dd_dez = mypseudo_derivative(new_time,Data.dd_dez,c_dd_dez,d_dd_dez);
 
 temp=0;
 if(isstruct(DATA.RS2))

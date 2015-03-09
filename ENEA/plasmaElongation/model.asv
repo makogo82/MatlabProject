@@ -80,7 +80,3 @@ legend('x1','x1L','x1H','dez')
 title('$dez$','Interpreter','latex')
 linkaxes(ax,'x');
 plotParam;
-
-
-
-
