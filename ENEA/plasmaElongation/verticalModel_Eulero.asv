@@ -7,9 +7,8 @@ function [x1New , x2New] = verticalModel_Eulero(time, Ts, x1 , x2 , IPLmis,Hmis,
     x2New = x2 + Ts*f;
     x1New = x1 + Ts*x2; 
     
-    if(abs(x1New) > 0.18)
-        x2New = 0;
-        x1New = 0.17;
+    if(abs(x1New) > 0.15)
+        
     end
     
 end

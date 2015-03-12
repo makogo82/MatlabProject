@@ -320,53 +320,11 @@ for j=2:length(mytime)
     end
     
     
-    
-    %the gains of xp and xd is reduced by the factor theta_gains
-    if(qOFF==1 )
-        %the reducing factor is less if acceleration is large 
-        theta_gains = 1.0*min(1.0, abs(dd_error)/(1.5*gammaHpid1)) + (1-min(1.0,abs(dd_error)/(1.5*gammaHpid1)))*theta_gain_0/(1+oscillationDezError);
-    else
-        theta_gains = 1.0;
-    end
-    
-    
-    %%
-    if(qPIDH == 0)
-        %partial pid, without the new value of the integrator
-        xpid_new = xp + xd + integralState;
-        %evaluation of amplitude and derivate saturations to obtain the integral new value
-        temp1 = min( max(satAmplPID - abs(xpid_new),0.0),max(satDerPID - ...
-               abs(xpid_new - xpidState),0.0));
-        integralState = integralState + min(temp1,max(-temp1, ...
-                          Ki*(xfilterState + previousError)*samplingTime*0.5));
-        
-        %final PID with amplitude and derivative saturation
-        xpidState = min(satAmplPID,max(-satAmplPID, xpidState  + ...
-            min(satDerPID,max(-satDerPID, -xpidState + xp + xd + integralState))));
-        %xpidState(j) = min(satAmplPID,max(-satAmplPID, xpidState(j)  + ...
-        %              min(satDerPID,max(-satDerPID, -xpidState(j) + xp(j) + xd(j) + integralState(j)))));    
-    end
-    
-    if((qPIDH ~= 0 || (qOFF==1 && acceleration_pid_H)) && NNLPID > 0.0 )
-        %adding the kick of the hybrid term
-        
-        if(acceleration_pid_H == 1)
-            xpidState = min(maxSatH,max(-maxSatH, xpidState  + ...
-            min(satDerPID,max(-satDerPID, -xpidState + theta_gains*(xp + xd) + integralState)))) ;
-        else
-            
-            xpidState = min(maxSatH,max(-maxSatH, xpidState+ ...
-                min(rampDerH,max(-rampDerH, qPIDH*rampGainH*fabs_d_error*(1+...
-                rampGainHdez*fabs_xfilterState) )))) ;
-        end
-    end
-    
-    % AL-H model: y(t)=x(t-gamma); gamma=16 campioni (8ms)
+    % Prediction Model
     % Vertical Model: IPL and IF are constant
     % IH: is the input
     % Prediction of 100 samples (50 ms) 
-    
-    
+       
     
     
     c_2H = 1.5E-5;
@@ -498,6 +456,57 @@ for j=2:length(mytime)
     bx(2) = subplot(2,1,2)
     plot(mytime,data.Hcalc,'r'); hold on;
     ylim([-500 500])
+    
+    %%END PREDICTION
+    
+    %% 
+    
+    
+    
+    
+    
+    
+    %the gains of xp and xd is reduced by the factor theta_gains
+    if(qOFF==1 )
+        %the reducing factor is less if acceleration is large 
+        theta_gains = 1.0*min(1.0, abs(dd_error)/(1.5*gammaHpid1)) + (1-min(1.0,abs(dd_error)/(1.5*gammaHpid1)))*theta_gain_0/(1+oscillationDezError);
+    else
+        theta_gains = 1.0;
+    end
+    
+    
+    %%
+    if(qPIDH == 0)
+        %partial pid, without the new value of the integrator
+        xpid_new = xp + xd + integralState;
+        %evaluation of amplitude and derivate saturations to obtain the integral new value
+        temp1 = min( max(satAmplPID - abs(xpid_new),0.0),max(satDerPID - ...
+               abs(xpid_new - xpidState),0.0));
+        integralState = integralState + min(temp1,max(-temp1, ...
+                          Ki*(xfilterState + previousError)*samplingTime*0.5));
+        
+        %final PID with amplitude and derivative saturation
+        xpidState = min(satAmplPID,max(-satAmplPID, xpidState  + ...
+            min(satDerPID,max(-satDerPID, -xpidState + xp + xd + integralState))));
+        %xpidState(j) = min(satAmplPID,max(-satAmplPID, xpidState(j)  + ...
+        %              min(satDerPID,max(-satDerPID, -xpidState(j) + xp(j) + xd(j) + integralState(j)))));    
+    end
+    
+    if((qPIDH ~= 0 || (qOFF==1 && acceleration_pid_H)) && NNLPID > 0.0 )
+        %adding the kick of the hybrid term
+        
+        if(acceleration_pid_H == 1)
+            xpidState = min(maxSatH,max(-maxSatH, xpidState  + ...
+            min(satDerPID,max(-satDerPID, -xpidState + theta_gains*(xp + xd) + integralState)))) ;
+        else
+            
+            xpidState = min(maxSatH,max(-maxSatH, xpidState+ ...
+                min(rampDerH,max(-rampDerH, qPIDH*rampGainH*fabs_d_error*(1+...
+                rampGainHdez*fabs_xfilterState) )))) ;
+        end
+    end
+    
+    
     
     
     %% OUTPUT SIGNAL FOR SIMULATIONS
