@@ -1,4 +1,4 @@
-function out = on_line_mypseudoderivative(indata,c,d,Ts, )
+function out = on_line_mypseudoderivativePredictionAcc(indata,c,d,Ts)
 %x  the domain vector
 %y  the image vector
 %c  the length of the two subwindows where the mean is evaluated

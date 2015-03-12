@@ -5,7 +5,7 @@ globalVar;
 
 disp(strcat('ELABORAZIONE SHOT: ', num2str(shot)));
 
-tempus = load([ '..\shotData\shot_' num2str(shot) '.mat']);
+tempus = load([ 'C:\shot\shot_' num2str(shot) '.mat']);
 
 DATA = tempus.Data;
 

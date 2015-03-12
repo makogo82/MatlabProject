@@ -10,8 +10,8 @@ clear all
 %    37870 37869];
  
 shots =         [ 38591  39091   39092  39094     38629       38628 38627  38404  38616 38615];
-shots_time =    [ 0.2   0.7     1.0      0.85       0.85       0.89   1.10   0.2  0.752   0.2 ];
-shots_endtime = [ 1.29  0.904   1.1        0.9      0.985       0.919  0.95   1.178   0.9  1.6];
+shots_time =    [ 0.2   0.7      1.1     0.85       0.85       0.89   1.10   0.2  0.752   0.2 ];
+shots_endtime = [ 1.29  0.904    1.14        0.9      0.985       0.919  0.95   1.178   0.9  1.6];
  
 shot =39092;
 Ts = 0.5E-3;
@@ -29,10 +29,10 @@ d_dez = 9;
 c_ddez = 2;
 d_ddez = 10;
  
-satAmplPID = 350; %Ampere
+satAmplPID = 350; %Ampere 
 satDerPID = 40.0; %Ampere/Ts
-Kp = 0.13; %1.0* 5.0 *  0.22/Ts;
-Ki = 1.0;
+Kp = 0.18; %1.0* 5.0 *  0.22/T s;
+Ki = 1.0; 
 Kd = 0.0025;
 derDeadzonePID = 50.0;
  
@@ -319,6 +319,8 @@ for j=2:length(mytime)
         switches_counter_OFF = min(avoid_chattering_PIDH_OFF, switches_counter_OFF + 1);
     end
     
+    
+    
     %the gains of xp and xd is reduced by the factor theta_gains
     if(qOFF==1 )
         %the reducing factor is less if acceleration is large 
@@ -384,21 +386,25 @@ for j=2:length(mytime)
     ampALH(1,2) = d_h;%(data.Hmis(j)-data.Hmis(j-1))/Ts;
     
 
-    if (j>2*model_delay) 
+    if (j>2*model_delay && qPIDH~=0) 
         xfilterStateP   = xfilterState_memo(j-1);
         integralStateP  = integralState_memo(j-1);
-        xpidStateP = xpidState_memo(j-13:j-1)
+        xpidStateP = xpidState_memo(j-13:j-1);
         x1Ho(1) = data.dez(j);
         x2Ho(1) = d_error_dez(j);
         time(1) = usecTime;   
         HcalcInput(1:model_delay+1) = data.Hcalc(j-model_delay:j);
         xfilterStateP   = xfilterState_memo(j-1);
-        xfilterStateStore   = xfilterState_memo(j-10:j-1);
-        for jj = 1:10
-            d_errorP = on_line_mypseudoderivativePrediction(xfilterStateStore(jj),c_dez,d_dez,samplingTime);
+        xfilterStateStore   = xfilterState_memo(j-d_dez-2:j-1);
+        for jj = 1:d_dez+2
+            d_errorP(jj) = on_line_mypseudoderivativePrediction(xfilterStateStore(jj),c_dez,d_dez,samplingTime);
+            dd_errorP(jj) = on_line_mypseudoderivativePredictionAcc(d_errorP(jj),c_ddez,d_ddez,samplingTime);
         end
-        pid(1) = 0;
-        for h = 1:1:100
+
+        pidH(1) = xpidState;
+        xpP(1)=xp;
+        xdP(1)=xd;
+        for h = 1:1:120
             % begin prediction 
             
             %IHinput  = HcalcInput(h);  %get first element  
@@ -423,38 +429,63 @@ for j=2:length(mytime)
             errPpre = x1Ho(h)    / ((1.5e-4) * (-1.0));
             
             xfilterStateP = tau_filter*xfilterStateP + (1-tau_filter)*errP;                        
-            d_errorP = on_line_mypseudoderivativePrediction(xfilterStateP,c_dez,d_dez,samplingTime);
+            d_errorP(d_dez+2+h) = on_line_mypseudoderivativePrediction(xfilterStateP,c_dez,d_dez,samplingTime);
+            dd_errorP(d_ddez+2+h) = on_line_mypseudoderivativePrediction(d_errorP(d_dez+2+h),c_ddez,d_ddez,samplingTime);
                        
-            %proportional action
-            xpP = Kp*(1+Kpe*abs(xfilterStateP))* xfilterStateP;
-            xdP = Kd* d_errorP; 
-            integralStateP =  integralStateP + Ki*(errP + errPpre)*samplingTime*0.5;
-            pid(h+1) = xpP+xdP+integralStateP;          %PID
-                        
-            HcalcInput(model_delay+1+h) = pid(h+1);   % save input         
+  
+            qOFF = 1;            
+           [pidH(h+1) , xpP(h+1) , xdP(h+1) , integralStateP(h+1)] = PID_H( Kp, Kpe, Kd,Ki, errP, errPpre, d_errorP(d_dez+2+h), xfilterStateP,...
+                                                             integralStateP(h), pidH(h), 1, derDeadzonePID,...
+                                                             satDerPID , satAmplPID, sigmaHpid1,kd_error,...
+                                                             q_kd_error,tau_filter,kd_2,samplingTime,...
+                                                             dd_errorP(d_dez+2+h),oscillationDezError,gammaHpid1,qOFF,theta_gain_0,maxSatH);
 
+            
+            HcalcInput(model_delay+1+h) = pidH(h+1);   % save input         
+
+            
+            
+            
             time(h+1) = time(h)+Ts;
 
         end 
+%         close all
+%         figure('Name','HcalcInput')
+%         subplot(4,1,1)
+%         plot(time, xpP)
+%         legend('prop')
+%         subplot(4,1,2)
+%         plot(time,  xdP)
+%         legend('diff')
+%         subplot(4,1,3)
+%         plot(time,integralStateP)
+%         legend('int')
+%         subplot(4,1,4)
+%         plot(time,pidH)
+%         hold on;
+%         plot(mytime,xpidState_memo,'r:')
+%         legend('int')
         
-        bx(1) = subplot(2,1,1)        
+        
+        bx(1) = subplot(2,1,1);        
         plot(time,x1Ho,'k:'); hold on;
-        %ylim([-max(data.dez)*2 max(data.dez)*2]);
+        ylim([-max(data.dez)*3 max(data.dez)*3]);
         grid on;
-        bx(2) = subplot(2,1,2)
+        bx(2) = subplot(2,1,2);
         %size([(time(1)-Ts*16):Ts:(time(1)-Ts) time])
-   
-        plot([(time(1)-Ts*model_delay):Ts:(time(1)-Ts) time],HcalcInput,'b--o'); hold on;
+        plot([(time(1)-Ts*model_delay):Ts:(time(1)-Ts) time],HcalcInput,'b--'); hold on;
+        
         
         data.Hcalc
         ylim([-500 500]);
-        pause(0.01);
+        pause(0.4);
         grid on
         linkaxes(bx,'x')
         HcalcInput = [];
         x1Ho = []; 
         x2Ho = [];
         clear on_line_mypseudoderivativePrediction;
+        clear on_line_mypseudoderivativePredictionAcc;
         %Vars=whos;
         %PersistentVars=Vars([Vars.global]);
         %PersistentVarNames={PersistentVars.name};
@@ -467,7 +498,6 @@ for j=2:length(mytime)
     bx(2) = subplot(2,1,2)
     plot(mytime,data.Hcalc,'r'); hold on;
     ylim([-500 500])
-
     
     
     %% OUTPUT SIGNAL FOR SIMULATIONS
