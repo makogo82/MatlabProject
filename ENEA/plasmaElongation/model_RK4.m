@@ -1,7 +1,7 @@
 %modello approssimato della posizione verticale
 clear all; clc; close all;
 c_2H = 1.5E-5;
-c_2L = 0.1E-5;
+c_2L = 0.5E-5;
 c_2 =  1E-5;
 c_3 = 0.7;
 c_4 = c_2*0.001;
@@ -9,10 +9,10 @@ c_5 = 0.4
 Ts = 0.0005;
 
 shots =         [39091   39092   39094  38629      38628    38627  38404  38616 ];
-shots_time =    [0.8     1.12    0.9    0.82      0.85     1.15    0.8    0.7 ];
-shots_endtime = [0.904   1.14    0.95   0.984   1.195    1.22   1.178   0.9 ];
+shots_time =    [0.8     1.12    0.9    0.82        0.85     1.15    0.8    0.7 ];
+shots_endtime = [0.904   1.14    0.95   0.984      1.195       1.22   1.178   0.9 ];
 
-shot =38629;
+shot =38627;
 Ts = 0.5E-3;
 samplingTime = Ts;
 t_start = shots_time(find(shots==shot));

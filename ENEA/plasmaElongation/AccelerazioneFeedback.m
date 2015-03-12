@@ -9,11 +9,11 @@ clear all
 %    38592 38591 38411 38410 38409 38404 38298 37930 37931 37932 ...
 %    37870 37869];
  
-shots =         [38591  39091   39092  39094  38629  38628 38627  38404  38616 38615];
-shots_time = [    0.2   0.1     0.2    0.2    0.85    0.2   0.5    0.2    0.1   0.2 ];
-shots_endtime = [ 1.29  0.904   1.14   1      0.985 1.195   1.22   1.178  0.9  1.6];
+shots =         [ 38591  39091   39092  39094     38629       38628 38627  38404  38616 38615];
+shots_time =    [ 0.2   0.7     1.0      0.85       0.85       0.89   1.10   0.2  0.752   0.2 ];
+shots_endtime = [ 1.29  0.904   1.1        0.9      0.985       0.919  0.95   1.178   0.9  1.6];
  
-shot =38627;
+shot =39092;
 Ts = 0.5E-3;
 samplingTime = Ts;
 t_start = shots_time(find(shots==shot));
@@ -31,14 +31,14 @@ d_ddez = 10;
  
 satAmplPID = 350; %Ampere
 satDerPID = 40.0; %Ampere/Ts
-Kp = 0.18 %1.0* 5.0 *  0.22/Ts;
+Kp = 0.13; %1.0* 5.0 *  0.22/Ts;
 Ki = 1.0;
 Kd = 0.0025;
 derDeadzonePID = 50.0;
  
 kd_error = 4E-5 % 4E-5 derivative term = (Kd + Kd_error*error )*d_error   
 q_kd_error = 1.0 % to activate the Kd_error if e*d_e>0
-kd_2 = 0.002    %0.002 piecewise gain added to Kd of the stardard derivative PID term when the |d_erro| is larger than SigmaHpid1
+kd_2 = 0.002;    %0.002 piecewise gain added to Kd of the stardard derivative PID term when the |d_erro| is larger than SigmaHpid1
 startTimeNonLinPID = 0.1;
 endTimeNonLinPID = 1.5;
  
@@ -104,14 +104,16 @@ a_3 = 0.5E-5;
 a_4  = 1.0E-6;
 dis = 0.2;
 s=tf([1 0],[1]);
-[Ad,Bd,Cd,Dd] = ssdata(c2d(tf([omega_p^2],[1 2*zita_p*omega_p omega_p^2])*exp(-model_delay*s),Ts));
 parti_modello = 2*model_delay;
  
 %%
  
 xplant = [10;-10];
 My_disturbances = 0*(heaviside(mytime-0.5)-heaviside(mytime-0.55));
- 
+figure('Name','simulation')
+plot(mytime,data.dez,'r','LineWidth',2); hold on;
+d_error_dez = mypseudo_derivative(mytime, data.dez, c_ddez, d_ddez);
+%%
 for j=2:length(mytime)
     
     %% MODELLO
@@ -142,6 +144,7 @@ for j=2:length(mytime)
     end
     
     xfilterState = tau_filter*xfilterState + (1-tau_filter)*error;
+    
     d_error = on_line_mypseudoderivative(xfilterState,c_dez,d_dez,samplingTime);
     dd_error = on_line_mypseudoderivativeCopy(d_error,c_ddez,d_ddez,samplingTime);
     d_h = on_line_mypseudoderivativeH(data.Hmis(j),c_dez,d_dez,samplingTime);
@@ -149,13 +152,6 @@ for j=2:length(mytime)
     %% simulated model
     if(j > parti_modello)
         myinput = data.Hcalc(j-model_delay);
-        %myinput = xpidState(j-model_delay);
-        
-        %modello_amplificatore_memo(j,1) = modello_amplificatore_memo(j-1,1) +  min(amplifier_derivative_threshold,max(-amplifier_derivative_threshold,...
-        %    (Ad(1,:)*modello_amplificatore_memo(j-1,:)'+Bd(1)*myinput)-modello_amplificatore_memo(j-1,1)));
-        %modello_amplificatore_memo(j,2) = modello_amplificatore_memo(j-1,2) +min(amplifier_derivative_threshold,max(-amplifier_derivative_threshold,...
-        %    (Ad(2,:)*modello_amplificatore_memo(j-1,:)'+Bd(2)*myinput)-modello_amplificatore_memo(j-1,2) ));
-        
         modello_amplificatore_memo(j,1) = modello_amplificatore_memo(j-1,1) +  (Ts*modello_amplificatore_memo(j-1,2));
         if(myinput-myinput_old<0)
             d_threshold = amplifier_negative_derivative_threshold;
@@ -163,7 +159,7 @@ for j=2:length(mytime)
             d_threshold = amplifier_positive_derivative_threshold;
         end
         modello_amplificatore_memo(j,2) = min(d_threshold/Ts,max(-d_threshold/Ts, ...
-            modello_amplificatore_memo(j-1,2) + Ts*(-2*zita_p*omega_p*modello_amplificatore_memo(j-1,2) - omega_p^2*modello_amplificatore_memo(j-1,1)+ omega_p^2*myinput) ));
+        modello_amplificatore_memo(j-1,2) + Ts*(-2*zita_p*omega_p*modello_amplificatore_memo(j-1,2) - omega_p^2*modello_amplificatore_memo(j-1,1)+ omega_p^2*myinput) ));
         %uu_memo(j) = modello_amplificatore_memo(j,1);
         uu_memo(j) = data.Hcalc(j);
         myinput_old = myinput;
@@ -370,48 +366,108 @@ for j=2:length(mytime)
     
     
     
-    HCompute(j)  = data.Hmis(j); % 
+    
     c_2H = 1.5E-5;
-    c_2L = 0.1E-5;
+    c_2L = 0.5E-5;
     c_2 =  1E-5;
     c_3 = 0.7;
     c_4 = c_2*0.001;
     c_5 = 0.4
     Ts = 0.0005;
     
-
-    x1Ho(1) = xfilterState;
-    x2Ho(1) = d_error;
-    time(1) = 0;
+     
+    IPLinput =  data.IPLmis(j);
+    IFinput  = data.Fmis(j);
     
-    if (j>15) 
-        IHinput = HCompute(j-15);
+    myinput_old = 0;
+    ampALH(1,1) = data.Hmis(j);
+    ampALH(1,2) = d_h;%(data.Hmis(j)-data.Hmis(j-1))/Ts;
+    
+
+    if (j>2*model_delay) 
+        xfilterStateP   = xfilterState_memo(j-1);
+        integralStateP  = integralState_memo(j-1);
+        xpidStateP = xpidState_memo(j-13:j-1)
+        x1Ho(1) = data.dez(j);
+        x2Ho(1) = d_error_dez(j);
+        time(1) = usecTime;   
+        HcalcInput(1:model_delay+1) = data.Hcalc(j-model_delay:j);
+        xfilterStateP   = xfilterState_memo(j-1);
+        xfilterStateStore   = xfilterState_memo(j-10:j-1);
+        for jj = 1:10
+            d_errorP = on_line_mypseudoderivativePrediction(xfilterStateStore(jj),c_dez,d_dez,samplingTime);
+        end
+        pid(1) = 0;
         for h = 1:1:100
             % begin prediction 
-            % data.IPLmis(j) and data.Fmis(j) are costant
-            [x1Ho(h+1), x2Ho(h+1)]  = verticalModel_RK(time(h),Ts , x1Ho(h) , x2Ho(h) , data.IPLmis(j),IHinput,data.Fmis(j), c_2H, c_3 , c_4 , c_5  );
-
-            y = x1Ho(h+1) / ((1.5e-4) * (-1.0));
-            error = y
-            xfilterState = tau_filter*xfilterState + (1-tau_filter)*error;
-            d_error = on_line_mypseudoderivative(xfilterState,c_dez,d_dez,samplingTime);
+            
+            %IHinput  = HcalcInput(h);  %get first element  
+            %AMPLIFICATORE
+            myinput =  HcalcInput(h);  %data.Hcalc(j-model_delay);
+            ampALH(h+1,1) = ampALH(h,1) + (Ts*ampALH(h,2));
+            if(myinput-myinput_old<0)
+                d_threshold = amplifier_negative_derivative_threshold;
+            else
+                d_threshold = amplifier_positive_derivative_threshold;
+            end
+            
+            ampALH(h+1,2) = min(d_threshold/Ts,max(-d_threshold/Ts, ...
+            ampALH(h,2) + Ts*(-2*zita_p*omega_p*ampALH(h,2) - omega_p^2*ampALH(h,1)+ omega_p^2*myinput) ));
+            myinput_old = myinput;
+            IHinput = ampALH(h+1,1);
+            
+            
+            [x1Ho(h+1), x2Ho(h+1)]  = verticalModel_Eulero(time(h), Ts, x1Ho(h), x2Ho(h), IPLinput, IHinput, IFinput, c_2H, c_3 , c_4 , c_5 );
+            %                        
+            errP =    x1Ho(h+1)  / ((1.5e-4) * (-1.0)); %% errore
+            errPpre = x1Ho(h)    / ((1.5e-4) * (-1.0));
+            
+            xfilterStateP = tau_filter*xfilterStateP + (1-tau_filter)*errP;                        
+            d_errorP = on_line_mypseudoderivativePrediction(xfilterStateP,c_dez,d_dez,samplingTime);
+                       
             %proportional action
-            xp = Kp*(1+Kpe*abs(xfilterState))*xfilterState;
-            xd = Kd* d_error; 
-            integralState = integralState + Ki*(xfilterState + previousError)*samplingTime*0.5;
-            pid = xp+xd+integralState;          %PID
+            xpP = Kp*(1+Kpe*abs(xfilterStateP))* xfilterStateP;
+            xdP = Kd* d_errorP; 
+            integralStateP =  integralStateP + Ki*(errP + errPpre)*samplingTime*0.5;
+            pid(h+1) = xpP+xdP+integralStateP;          %PID
+                        
+            HcalcInput(model_delay+1+h) = pid(h+1);   % save input         
 
-            HCompute(h) = pid;             % save input
-            IHinput  = HCompute(j-16+h+1); % delay
+            time(h+1) = time(h)+Ts;
 
-            x1Ho(h) = x1Ho(h+1);
-            x2Ho(h) = x2Ho(h+1);
-            %
-
-        end
+        end 
+        
+        bx(1) = subplot(2,1,1)        
+        plot(time,x1Ho,'k:'); hold on;
+        %ylim([-max(data.dez)*2 max(data.dez)*2]);
+        grid on;
+        bx(2) = subplot(2,1,2)
+        %size([(time(1)-Ts*16):Ts:(time(1)-Ts) time])
+   
+        plot([(time(1)-Ts*model_delay):Ts:(time(1)-Ts) time],HcalcInput,'b--o'); hold on;
+        
+        data.Hcalc
+        ylim([-500 500]);
+        pause(0.01);
+        grid on
+        linkaxes(bx,'x')
+        HcalcInput = [];
+        x1Ho = []; 
+        x2Ho = [];
+        clear on_line_mypseudoderivativePrediction;
+        %Vars=whos;
+        %PersistentVars=Vars([Vars.global]);
+        %PersistentVarNames={PersistentVars.name};
     end
-    
-    
+      
+    hold on;
+    bx(1) = subplot(2,1,1)        
+    plot(mytime,data.dez,'r'); hold on;
+    %ylim([-max(data.dez)*2 max(data.dez)*2]);
+    bx(2) = subplot(2,1,2)
+    plot(mytime,data.Hcalc,'r'); hold on;
+    ylim([-500 500])
+
     
     
     %% OUTPUT SIGNAL FOR SIMULATIONS
@@ -431,97 +487,7 @@ for j=2:length(mytime)
     oscillationDezError_memo(j)= oscillationDezError;
     switchCountDError_memo(j) = switchCountDError;
 end
- 
-if(simula_mymodel==1)
-    
-    figure(1)
-    ax(1) = subplot(2,1,1);
-    plot(mytime,data.Hcalc,'b',mytime,data.Hmis,'r',mytime,modello_amplificatore_memo(:,1),'r--','LineWidth',2);%,mytime,xpid_test,'r');
-    title(num2str(shot))
-    grid on
-    legend('ALHcalc','ALHmis','Estimated','Location','SouthWest');
-    ax(2) = subplot(2,1,2);
-    plot(mytime,data.dez,'r',mytime,modello_simulato_memo(:,1),'r--','LineWidth',2);
-    grid on
-    ylim([-0.2,0.2]);
-    legend('data.dez','Estimated','Location','SouthWest');
-    linkaxes(ax,'x');
-    %%
-    A = [0  1 0; 0 0 1; 0 0 0];
-    rho = 1000;
-    K = [3*rho; 3*rho^2; 1*rho^3];
-    %eig(A-K*[1,0,0])
-    XX = zeros(length(mytime),3);
-    for i=2:length(mytime)
-        XX(i,:) = XX(i-1,:) + Ts*(A*XX(i-1,:)' + K*(xfilterState_memo(i-1)-XX(i-1,1)))';
-    end    
-    %%
-    
-    figure(2)
-    %c1 = a_3*data.IPLmis'./abs(0.8-abs(modello_simulato_memo(:,1))).*uu_memo;
-    c_2H = 1.7E-5;
-    c_2L = 0.3E-5;
-    c_2 = 1E-5;
-    c_3 = 0.8;
-    b_pl = 0;%0.29;%(data.zs1-data.zs2)/2.0;
-    t1 =  c_2*data.IPLmis'.*data.Hmis'.*(1./(c_3-1.5*(data.dez+b_pl)) - 1./(-c_3-1.5*(data.dez+b_pl)) )';    
-    t1H = c_2H*data.IPLmis'.*data.Hmis'.*(1./(c_3-1.5*(data.dez+b_pl)) - 1./(-c_3-1.5*(data.dez+b_pl)) )';
-    t1L = c_2L*data.IPLmis'.*data.Hmis'.*(1./(c_3-1.5*(data.dez+b_pl)) - 1./(-c_3-1.5*(data.dez+b_pl)) )';
 
-    
-    
-    c_4 = c_2*0.001;
-    c_5 = 0.4;    
-    b_pl = 0;
-    t2 = -c_4*data.Fmis'.*data.IPLmis'.*(2*( 1./(c_5-1.5*(data.dez+b_pl)) + 1./(-c_5-1.5*(data.dez+b_pl)))).^2';
-    c_6 = 1500;
-    c_7 = 0.12;
-    mydead = zeros(length(mytime),1);
-    for i=1:length(mytime)
-        if(abs(1.5*data.dez(i))>= c_7)
-            mydead(i) = 1.5*data.dez(i)-sign(data.dez(i))*c_7;
-        else
-            mydead(i) = 0;
-        end
-    end
-    t3 = -(c_6*mydead).^1.2;
-    %acc_int = lsim(tf([1],[1 0]),(t2+t1),mytime);
-    ax(1) = subplot(2,1,1);
-    plot( mytime,t1,mytime,t2,...
-          mytime,t1+t2+t3,...
-          mytime,t1H+t2+t3,...
-          mytime,t1L+t2+t3,...
-          mytime,dd_error_memo*(((1.5e-4) * (-1.0))),'b-.','LineWidth',2);
-      grid on;
-      legend('t1','t2','t1+t2+t3','t1H','t1L','dd_dez','location','SouthWest');
-    ax(2) = subplot(2,1,2);
-    
-    %xlim([0.5, 1.15]);
-    ylim([-1000, 1000]);
-    title(num2str(shot))
-    plot( mytime,data.Fmis*1e-2,mytime,data.Hmis,'LineWidth',2);
-    grid on;  
-    legend('IFmis1E-2','IHmis')
-    
 
-    
-
-    
-    linkaxes(ax,'x');
-    break
-    
-    %%
-figure('Name','IPL')
-plot(mytime,data.IPLmis);
-figure('Name','elong')
-plot(mytime,data.elong);
-figure('Name','Hmis')
-plot(mytime,data.Hmis);
-figure('Name','dez')
-plot(mytime,data.dez);
-figure('NAme','Zs1-Zs2');
-plot(mytime,data.zs1,mytime,data.zs2,mytime,(data.zs1+data.zs2)*0.5);
-else
-  
- 
-end
+figure('Name','If')
+    plot(mytime,data.Fmis,'r'); hold on;

@@ -163,7 +163,7 @@ for j=2:length(mytime)
             d_threshold = amplifier_positive_derivative_threshold;
         end
         modello_amplificatore_memo(j,2) = min(d_threshold/Ts,max(-d_threshold/Ts, ...
-            modello_amplificatore_memo(j-1,2) + Ts*(-2*zita_p*omega_p*modello_amplificatore_memo(j-1,2) - omega_p^2*modello_amplificatore_memo(j-1,1)+ omega_p^2*myinput) ));
+        modello_amplificatore_memo(j-1,2) + Ts*(-2*zita_p*omega_p*modello_amplificatore_memo(j-1,2) - omega_p^2*modello_amplificatore_memo(j-1,1)+ omega_p^2*myinput) ));
         %uu_memo(j) = modello_amplificatore_memo(j,1);
         uu_memo(j) = data.Hcalc(j);
         myinput_old = myinput;
