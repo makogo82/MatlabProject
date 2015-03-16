@@ -9,11 +9,11 @@ clear all
 %    38592 38591 38411 38410 38409 38404 38298 37930 37931 37932 ...
 %    37870 37869];
  
-shots =         [ 38591  39091   39092  39094     38629       38628 38627  38404  38616 38615];
-shots_time =    [ 0.2   0.7      1.1     0.85       0.85       0.89   1.10   0.2  0.752   0.2 ];
-shots_endtime = [ 1.29  0.904    1.14        0.9      0.985       0.919  0.95   1.178   0.9  1.6];
+shots =         [ 38591  39091   39092  39094        38629     38628    38627  38404  38616 38615];
+shots_time =    [ 0.2   0.7      1.121     0.85       0.85      0.88     0.8   0.2  0.752   0.2 ];
+shots_endtime = [ 1.29  0.904    1.19        0.9     0.985      1.05     0.95   1.178   0.9  1.6];
  
-shot =39092;
+shot = 38628;
 Ts = 0.5E-3;
 samplingTime = Ts;
 t_start = shots_time(find(shots==shot));
@@ -80,6 +80,7 @@ PIDsimple_memo  = zeros(length(data.dez),1);
 switches_counter_memo  = zeros(length(data.dez),1);
 switches_counter_OFF_memo  = zeros(length(data.dez),1);
 qOFF_memo = zeros(length(data.dez),1);
+qOFFpredictor_memo = zeros(length(data.dez),1);
 theta_gains_memo = ones(length(data.dez),1); 
 oscillationDezError_memo = zeros(length(data.dez),1);
 switchCountDError_memo = zeros(length(data.dez),1);
@@ -119,7 +120,7 @@ for j=2:length(mytime)
     %% MODELLO
     error_memo(j) = y(j);
     previousError = error_memo(j-1);
-    
+    qOFFPredictor = 0;
     %% Interfecciamento dati ingresso
     usecTime = data.time(j);
     xfilterState = xfilterState_memo(j-1);
@@ -130,6 +131,7 @@ for j=2:length(mytime)
     switches_counter = switches_counter_memo(j-1);
     switches_counter_OFF = switches_counter_OFF_memo(j-1);
     qOFF = qOFF_memo(j-1);
+    qOffpredictor = qOFFpredictor_memo(j-1);
     theta_gains = theta_gains_memo(j-1);
     switchCountDError = switchCountDError_memo(j-1);
     oscillationDezError= oscillationDezError_memo(j-1);
@@ -332,7 +334,7 @@ for j=2:length(mytime)
     c_2 =  1E-5;
     c_3 = 0.7;
     c_4 = c_2*0.001;
-    c_5 = 0.4
+    c_5 = 0.4;
     Ts = 0.0005;
     
      
@@ -343,7 +345,7 @@ for j=2:length(mytime)
     ampALH(1,1) = data.Hmis(j);
     ampALH(1,2) = d_h;%(data.Hmis(j)-data.Hmis(j-1))/Ts;
     
-
+    
     if (j>2*model_delay && qPIDH~=0) 
         xfilterStateP   = xfilterState_memo(j-1);
         integralStateP  = integralState_memo(j-1);
@@ -362,6 +364,9 @@ for j=2:length(mytime)
         pidH(1) = xpidState;
         xpP(1)=xp;
         xdP(1)=xd;
+        
+        signDezStartPrediction = sign(x1Ho(1));
+        
         for h = 1:1:120
             % begin prediction 
             
@@ -391,20 +396,23 @@ for j=2:length(mytime)
             dd_errorP(d_ddez+2+h) = on_line_mypseudoderivativePrediction(d_errorP(d_dez+2+h),c_ddez,d_ddez,samplingTime);
                        
   
-            qOFF = 1;            
-           [pidH(h+1) , xpP(h+1) , xdP(h+1) , integralStateP(h+1)] = PID_H( Kp, Kpe, Kd,Ki, errP, errPpre, d_errorP(d_dez+2+h), xfilterStateP,...
+            qOFFEnable = 1;            
+            [pidH(h+1) , xpP(h+1) , xdP(h+1) , integralStateP(h+1)] = PID_H( Kp, Kpe, Kd,Ki, errP, errPpre, d_errorP(d_dez+2+h), xfilterStateP,...
                                                              integralStateP(h), pidH(h), 1, derDeadzonePID,...
                                                              satDerPID , satAmplPID, sigmaHpid1,kd_error,...
                                                              q_kd_error,tau_filter,kd_2,samplingTime,...
-                                                             dd_errorP(d_dez+2+h),oscillationDezError,gammaHpid1,qOFF,theta_gain_0,maxSatH);
+                                                             dd_errorP(d_dez+2+h),oscillationDezError,gammaHpid1,qOFFEnable,theta_gain_0,maxSatH);
 
             
-            HcalcInput(model_delay+1+h) = pidH(h+1);   % save input         
-
-            
-            
-            
+            HcalcInput(model_delay+1+h) = pidH(h+1);   % save input  
             time(h+1) = time(h)+Ts;
+            
+            if(signDezStartPrediction == -sign(x1Ho(h+1)))
+                qOFFPredictor = 1;
+                qOFF = 1;
+                h=200;
+            end
+            
 
         end 
 %         close all
@@ -449,19 +457,24 @@ for j=2:length(mytime)
         %PersistentVarNames={PersistentVars.name};
     end
       
+    
+    
     hold on;
-    bx(1) = subplot(2,1,1)        
+    bx(1) = subplot(2,1,1);        
     plot(mytime,data.dez,'r'); hold on;
+    plot(mytime,qOFF_memo,'b'); hold on;
+    plot(mytime,qOFFpredictor_memo,'g'); hold on;
+    plot(mytime,qPIDH_memo,'c:'); hold on;
+    legend('dez','qOFF_memo','qOFFpredictor_memo','qPIDH')
+    
     %ylim([-max(data.dez)*2 max(data.dez)*2]);
-    bx(2) = subplot(2,1,2)
+    bx(2) = subplot(2,1,2);
     plot(mytime,data.Hcalc,'r'); hold on;
     ylim([-500 500])
-    
+    linkaxes(bx,'x')
     %%END PREDICTION
     
     %% 
-    
-    
     
     
     
@@ -522,11 +535,15 @@ for j=2:length(mytime)
     switches_counter_memo(j) = switches_counter;
     switches_counter_OFF_memo(j) = switches_counter_OFF;
     qOFF_memo(j) = qOFF;
+    qOFFpredictor_memo(j) = qOFFPredictor;
     theta_gains_memo(j) = theta_gains;
     oscillationDezError_memo(j)= oscillationDezError;
     switchCountDError_memo(j) = switchCountDError;
 end
 
-
+%%
 figure('Name','If')
-    plot(mytime,data.Fmis,'r'); hold on;
+subplot(2,1,1)
+plot(mytime,data.Fmis); hold on;
+subplot(2,1,2)
+plot(mytime,qOFF_memo); hold on;
