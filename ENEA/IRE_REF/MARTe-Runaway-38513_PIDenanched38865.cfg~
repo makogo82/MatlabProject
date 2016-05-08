@@ -1,0 +1,5322 @@
+//Version = "$Id: MARTe-WaterTank-Streaming.cfg,v 1.1 2010/04/21 10:59:12 aneto Exp $"
+LoggerAddress = "192.107.90.240"
+
+
+DefaultCPUs = 15
++WEB = {
+    Class = HttpGroupResource
+    +BROWSE = {
+       Title = "Http Object Browser"
+        Class = HttpGCRCBrowser
+        AddReference = {MARTe StateMachine OBJBROWSE THRBROWSE CFGUpload HTTPSignalServer GAMConfigurationDatabase  FlotPlot MatlabSignalServer}
+    }
+	+FLOT_DIR = {
+		Class   = HttpDirectoryResource
+		BaseDir = "/home/luca/code/BaseLib2/3rdPartyLibs/flot"
+	}
+}
++HTTPSERVER = {
+    Class = HttpService
+    Port = 8040
+    VerboseLevel = 10
+    Root = WEB
+}
++OBJBROWSE = {
+    Class = HttpClassListResource
+}
++THRBROWSE = {
+    Class = HttpThreadListResource
+}
+
++HTTPSignalServer={
+     Class = SignalServer
+     Timeout = 10
+}
+
++MatlabSignalServer = {
+    Class = MATLABHandler
+}
++FlotPlot={
+     Class = FlotPlot
+}
++CFGUpload = {
+    Class = CFGUploader
+    UploadTimeoutSec=60
+}
++GAMConfigurationDatabase =  {
+    Class = CDB
+}
++StateMachine = {
+    Class = StateMachine
+    VerboseLevel = 10
+    +INITIAL = {
+        Class = StateMachineState
+        StateCode = 0x0
+        +START = {
+            Class = StateMachineEvent
+            NextState = IDLE
+            Value = START
+            +STARTALL = {
+                Class = MessageDeliveryRequest
+                Sender = StateMachine
+                Destinations = "HTTPSERVER MARTe"
+                MsecTimeOut = 1000000
+                Flags = NoReply
+                Message = {
+                    Class = Message
+                    Content = START
+                }
+            }
+        }
+    }
+    +IDLE = {
+        Class = StateMachineState
+        StateCode = 0x500
+        +PULSE_SETUP_COMPLETED = {
+            Class = StateMachineEvent
+            Code = 0x701
+            NextState = WAITING_FOR_PRE
+            +NOTIFY = {
+                Class = MessageEnvelope
+                Sender = StateMachine
+                Destination = MARTe
+                +MESSAGE = {
+                    Class = Message
+                    Content = PREPULSECHECK
+                }
+            }
+	  +UPDATE_HTTP_SIGNAL_SERVER = {
+                Class = MessageEnvelope
+                Destination = HTTPSignalServer
+                +MESSAGE = {
+                    Class = Message
+                    Content = AUTODETECT
+                }
+            }
+	 +UPDATE_MSS = {
+                Class = MessageEnvelope
+                Destination = MatlabSignalServer
+                +MESSAGE = {
+                    Class = Message
+                    Content = AUTODETECT
+                }
+            }
+	+UPDATE_FP = {
+                Class = MessageEnvelope
+	        Destination = FlotPlot
+                +MESSAGE = {
+                    Class = Message
+                    Content = AUTODETECT
+                }
+	 }
+        }
+        +INHIBIT = {
+            Class = StateMachineEvent
+            Code = 0x704
+            NextState = INHIBIT
+        }
+        +ACTIVATE = {
+            Class = StateMachineEvent
+            Code = 0x705
+            NextState = SAMESTATE
+        }
+        +UNRECOVERABLE = {
+            Class = StateMachineEvent
+            Code = 0x776
+            NextState = UNRECOVERABLE
+        }
+        +CONFIG_ERROR = {
+            Class = StateMachineEvent
+            Code = 0x777
+            NextState = CONFIG_ERROR
+        }
+        +CONFIG_OK = {
+            Class = StateMachineEvent
+            Code = 0x778
+            NextState = SAMESTATE
+            /*+NOTIFY = {
+                Class = MessageEnvelope
+                Sender = StateMachine
+                Destination = CODAS.SMH
+                +SENDSTATE = {
+                    Class = Message
+                    Code = 0x500
+                }
+            }*/
+        }
+        +STOP = {
+            Class = StateMachineEvent
+            NextState = IDLE
+            Value = STOP
+            Code = 0x005
+            +STOPALL = {
+                Class = MessageDeliveryRequest
+                Sender = StateMachine
+                Destinations = "HTTPSERVER MARTe"
+                MsecTimeOut = 100000
+                Flags = NoReply
+                Message = {
+                    Class = Message
+                    Content = STOP
+                }
+            }
+        }
+    }
+    +WAITING_FOR_PRE = {
+        Class = StateMachineState
+        StateCode = 0x504
+        +PRE = {
+            Class = StateMachineEvent
+            Code = 0x708
+            NextState = PULSING
+            +NOTIFY = {
+                Class = MessageEnvelope
+                Sender = StateMachine
+                Destination = MARTe
+                +MESSAGE = {
+                    Class = Message
+                    Content = PULSESTART
+                }
+            }
+        }
+        +ABORT = {
+            Class = StateMachineEvent
+            Code = 0x702
+            NextState = IDLE
+            +NOTIFY = {
+                Class = MessageEnvelope
+                Sender = StateMachine
+                Destination = MARTe
+                +MESSAGE = {
+                    Class = Message
+                    Content = PULSESTOP
+                }
+            }
+        }
+        +COLLECTION_COMPLETED = {
+            Class = StateMachineEvent
+            Code = 0x703
+            NextState = COMM_ERROR
+        }
+    }
+    +PULSING = {
+        Class = StateMachineState
+        StateCode = 0x505
+        /*+ENTER = {
+            Class = MessageEnvelope
+            Destination = CODAS.SMH
+            +SENDSTATE = {
+                Class = Message
+            }
+        }*/
+        +ABORT = {
+            Class = StateMachineEvent
+            Code = 0x702
+            NextState = IDLE
+            +NOTIFY = {
+                Class = MessageEnvelope
+                Sender = StateMachine
+                Destination = MARTe
+                +MESSAGE = {
+                    Class = Message
+                    Content = PULSESTOP
+                }
+            }
+        }
+        +EJP = {
+            Class = StateMachineEvent
+            Code = 0x709
+            NextState = POST_PULSE
+            +NOTIFY = {
+                Class = MessageEnvelope
+                Sender = StateMachine
+                Destination = MARTe
+                +MESSAGE = {
+                    Class = Message
+                    Content = PULSESTOP
+                }
+            }
+        }
+    }
+    +POST_PULSE = {
+        Class = StateMachineState
+        StateCode = 0x507
+        /*+ENTER = {
+            Class = MessageEnvelope
+            Destination = CODAS.SMH
+            +SENDSTATE = {
+                Class = Message
+            }
+        }*/
+        +COLLECTION_COMPLETED = {
+            Class = StateMachineEvent
+            Code = 0x703
+            NextState = IDLE
+            +NOTIFY = {
+                Class = MessageEnvelope
+                Sender = StateMachine
+                Destination = MARTe
+                +MESSAGE = {
+                    Class = Message
+                    Content = COLLECTIONCOMPLETED
+                }
+            }
+        }
+    }
+    +INHIBIT = {
+        Class = StateMachineState
+        StateCode = 0x508
+        +ACTIVATE = {
+            Class = StateMachineEvent
+            Code = 0x705
+            NextState = IDLE
+        }
+    }
+    +ERROR = {
+        Class = StateMachineState
+        StateCode = 0x601
+        +ACTIVATE = {
+            Class = StateMachineEvent
+            Code = 0x705
+            NextState = IDLE
+        }
+        +COLLECTION_COMPLETED = {
+            Class = StateMachineEvent
+            Code = 0x703
+            NextState = IDLE
+        }
+    }
+    +CONFIG_ERROR = {
+        Class = StateMachineState
+        StateCode = 0x601
+        /*+ENTER = {
+            Class = MessageEnvelope
+            Destination = CODAS.SMH
+            +SENDSTATE = {
+                Class = Message
+            }
+        }*/
+        +ACTIVATE = {
+            Class = StateMachineEvent
+            Code = 0x705
+            NextState = IDLE
+        }
+        +CONFIG_OK = {
+            Class = StateMachineEvent
+            Code = 0x778
+            NextState = IDLE
+            /*+NOTIFY = {
+                Class = MessageEnvelope
+                Sender = StateMachine
+                Destination = CODAS.SMH
+                +SENDSTATE = {
+                    Class = Message
+                    Code = 0x500
+                }
+            }*/
+        }
+	+CONFIG_ERROR = {
+            Class = StateMachineEvent
+            Code = 0x777
+            NextState = CONFIG_ERROR
+        }
+    }
+    +UNRECOVERABLE = {
+        Class = StateMachineState
+        StateCode = 0x601
+        +DEFAULT = {
+            Class = StateMachineEvent
+            UserCode = 0
+            NextState = UNRECOVERABLE
+        }
+    }
+    +COMM_ERROR = {
+        StateCode = 0x601
+        Class = StateMachineState
+        +ABORT = {
+            Class = StateMachineEvent
+            Code = 0x702
+            NextState = SAMESTATE
+        }
+    }
+    +DEFAULT = {
+        Class = StateMachineState
+        StateCode = 0x601
+        +ABORT = {
+            Class = StateMachineEvent
+            Code = 0x702
+            NextState = IDLE
+        }
+        +PRE = {
+            Class = StateMachineEvent
+            Code = 0x708
+            NextState = SAMESTATE
+        }
+        +EJP = {
+            Class = StateMachineEvent
+            Code = 0x709
+            NextState = SAMESTATE
+        }
+    }
+}
++MARTeMenu = {
+    Class = MarteSupLib::MARTeMenu
+    Title = "MARTe Menu"
+    +MenuA = {
+        Class = MenuContainer
+        Title = "CODAS Interface"
+        +ABORT = {
+            Class = SendMessageMenuEntry
+            Title = Abort
+            Envelope = {
+                Class = MessageEnvelope
+                Sender = MARTeMenu
+                Destination = StateMachine
+                +Message = {
+                    Class = Message
+                    Code = 0x702
+                    Content = ABORT
+                }
+            }
+        }
+        +INHIBIT = {
+            Class = SendMessageMenuEntry
+            Title = Inhibit
+            Envelope = {
+                Class = MessageEnvelope
+                Sender = MARTeMenu
+                Destination = StateMachine
+                +Message = {
+                    Class = Message
+                    Code = 0x704
+                    Content = Inhibit
+                }
+            }
+        }
+        +ACTIVATE = {
+            Class = SendMessageMenuEntry
+            Title = Activate
+            Envelope = {
+                Class = MessageEnvelope
+                Sender = MARTeMenu
+                Destination = StateMachine
+                +Message = {
+                    Class = Message
+                    Code = 0x705
+                    Content = Activate
+                }
+            }
+        }
+        +PULSESETUPCOMPLETE = {
+            Class = SendMessageMenuEntry
+            Title = "Pulse Setup Conplete"
+            Envelope = {
+                Class = MessageEnvelope
+                Sender = MARTeMenu
+                Destination = StateMachine
+                +Message = {
+                    Class = Message
+                    Code = 0x701
+                    Content = WAITING_FOR_PRE
+                }
+            }
+        }
+        +PRE = {
+            Class = SendMessageMenuEntry
+            Title = "Pulse Start"
+            Envelope = {
+                Class = MessageEnvelope
+                Sender = MARTeMenu
+                Destination = StateMachine
+                +Message = {
+                    Class = Message
+                    Code = 0x708
+                    Content = PRE
+                }
+            }
+        }
+        +EJP = {
+            Class = SendMessageMenuEntry
+            Title = "Pulse End"
+            Envelope = {
+                Class = MessageEnvelope
+                Sender = MARTeMenu
+                Destination = StateMachine
+                +Message = {
+                    Class = Message
+                    Code = 0x709
+                    Content = EJP
+                }
+            }
+        }
+        +COLLECTIONCOMPLETED = {
+            Class = SendMessageMenuEntry
+            Title = "Collection Completed"
+            Envelope = {
+                Class = MessageEnvelope
+                Sender = MARTeMenu
+                Destination = StateMachine
+                +Message = {
+                    Class = Message
+                    Code = 0x703
+                    Content = POSTPULSE
+                }
+            }
+        }
+    }
+    AddReference = MARTe.MARTe
+}
++MARTe = {
+    Class = MARTeContainer
+    StateMachineName = StateMachine
+    Level1Name = LEVEL1
+    MenuContainerName = MARTe
+    +MARTe = {
+        Class = MenuContainer
+    }
+    +DriverPool = {
+        Class = GCReferenceContainer
+        +TimerBoard = {
+            Class = GenericTimerDrv
+            NumberOfInputs = 3
+            NumberOfOutputs = 0
+            TimerUsecPeriod = 500
+            SynchronizationMethod = Synchronizing
+            CPUMask = 32
+	    UseLowLevelDriver = yes
+        }
+
+               +StreamingDrv = {
+		    Class = StreamingDriver
+		    NumberOfOutputs = 967 //1475 // 655 //139        
+		    NumberOfBuffers = 20000
+		    NumberOfTransferBuffers = 10
+		    ReceiverUDPPort = 14001
+		    ReceiverUDPAddress = "192.168.200.231"
+		    //"192.168.200.210"
+		    CpuMask = 16
+	} 
+//Fast To Slow
+	+SynchBoard = {
+		    Class = SynchronizingDriver
+		    NumberOfInputs  = 17
+		    NumberOfOutputs = 17
+		    DownSamplingSize = 10
+	 }   
+	//SloToFast
+	+SynchBoard2 = {
+            Class = SynchronizingDriver
+            NumberOfInputs  = 824
+            NumberOfOutputs = 824
+            DownSamplingSize = 1
+        }
+    }
+    +Messages = {
+        Class = GCReferenceContainer
+        +FatalErrorMessage = {
+            Class = MessageDeliveryRequest
+            Destinations = StateMachine
+            MsecTimeOut = 100000
+            Flags = NoReply
+            Message = {
+                Class = Message
+                Code = 0x776
+                Content = UNRECOVERABLE
+            }
+        }
+        +ConfigLoadErrorMessage = {
+            Class = MessageDeliveryRequest
+            Destinations = StateMachine
+            MsecTimeOut = 100000
+            Flags = NoReply
+            Message = {
+                Class = Message
+                Code = 0x777
+                Content = CONFIG_ERROR
+            }
+        }
+        +ConfigLoadOKMessage = {
+            Class = MessageDeliveryRequest
+            Destinations = StateMachine
+            MsecTimeOut = 100000
+            Flags = NoReply
+            Message = {
+                Class = Message
+                Code = 0x778
+                Content = CONFIG_OK
+            }
+        }
+        +SafetyErrorMessage = {
+            Class = MessageDeliveryRequest
+            Destinations = MARTe
+            MsecTimeOut = 100000
+            Flags = NoReply
+            Message = {
+                Class = Message
+                Content = ERROR
+            }
+        }
+    }
+    +ExternalTimeTriggeringService = {
+        Class = InterruptDrivenTTS
+        TsOnlineUsecPeriod = 500
+        TsOnlineUsecPhase = 0
+        TsOfflineUsecPeriod = 5000
+        TsOfflineUsecPhase = 0
+	TsTimeOutMsecTime = 1000
+        TimeModule = {
+            BoardName = TimerBoard
+        }
+    }
+ +ExternalTimeTriggeringServiceThread2 = {
+        Class = InterruptDrivenTTS
+        TsOnlineUsecPeriod = 5000
+        TsOnlineUsecPhase = 0
+        TsOfflineUsecPeriod = 5000
+
+	TsTimeOutMsecTime = 100000
+        TsOfflineUsecPhase = 0
+        TimeModule = {
+            BoardName = SynchBoard
+        }
+    }
+     +Thread_1 = {
+        Class = RealTimeThread
+        ThreadPriority = 28
+        RunOnCPU = 32
+        RTStatusChangeMsecTimeout = 100000
+        SMStatusChangeMsecTimeout = 100000
+        OfflineSemaphoreTimeout = 50
+        TriggeringServiceName = MARTe.ExternalTimeTriggeringService
+        SafetyMsecSleep = 1
+        +DDB = {
+            Class = DDB
+        }
+        +Timer = {
+            Class = IOGAMs::TimeInputGAM
+            TriggeringServiceName = ExternalTimeTriggeringService
+            BoardName = TimerBoard
+            Signals = {
+                time = {
+                    SignalName = usecTime
+                    SignalType = int32
+                }
+
+                counter = {
+                    SignalName = packetNumber
+                    SignalType = int32
+                }
+
+		LostCycles = {
+		    SignalName = mylostCycles
+	  	    SignalType = int32
+		}
+            }
+        }
+
+	+Waves = {
+                Class = WaveformGenerator
+                UsecTime = usecTime
+                +PREFILL_REF = {
+                   Class = WaveformClassPoints
+                   Tstart = 0.00
+                   Tend = 10.0
+                   TimeVector =  {0.0 6.0     9.99    10 }
+                   ValueVector = {0.0 5e-5    5e-5    0 }	
+
+                }	
+                 
+
+                +DENSITY_PLASMA_REF = {
+                   Class = WaveformClassPoints
+                   Tstart = 0.0
+                   Tend = 13.0
+                   //Sparo 30132
+                  // TimeVector =  {0.0 10.0 10.1  10.45 10.8 11.0 11.4 11.5}
+                  // ValueVector = {0.0  0.0  65    110   240  320  500  0 }	
+                    TimeVector =  {0.0 10.0 10.2 11.4 11.6 12.0}
+                    ValueVector = {0.0 0.0  65   65    0   0}	
+                   //TimeVector =  {0.0 10.0  10.02 10.15 10.5  11.4 11.5 11.6}
+                   //ValueVector = {0.0 0.0    50    50   140   140  0.0  0.0 }	
+
+                }
+
+
+                +CALIB_PULSES = {   
+                   Class = WaveformClassPoints
+                   Tstart = 0.0
+                   Tend = 20.0
+                   TimeVector =  {0.0 10.0 20.0}
+                   ValueVector = {0.0 10.0 0.0}	
+
+                }
+
+
+                +ZEROWAVE =  {
+                           Class = WaveformClassPoints
+                           Tstart = 0.0
+                           Tend = 13.0
+                           TimeVector =  {0.0   12.0}
+                           ValueVector = {0.0   0.0}
+
+                }
+               
+		+absoluteRunawayReRif= {
+                	Class       = WaveformClassPoints
+			Tstart		= 0.0
+			Tend		= 15.0                
+                	TimeVector  = {0.0  15.0}
+                	ValueVector = {1.2 1.2}
+		} 
+		+absoluteRunawayZlRif= {
+                	Class       = WaveformClassPoints
+			Tstart		= 0.0
+			Tend		= 15.0                
+                	TimeVector  = {0.0 15.0}
+                	ValueVector = {-0.28 -0.28}
+		}
+         }
+	
+
+	+DataGAM = {
+	   Class = FTUBinDataGAM
+	     DataFile="/home/luca/code/MARTe/TestArea/data_actual.dat" 
+          
+          
+	 InputSignals ={
+		signal1 = {
+		    SignalName = usecTime
+		    SignalType = int32
+                }
+           }
+	 OutputSignals = { 
+
+                Signal3 = {
+                    SignalName = POTPER
+                    SignalType = float
+                }
+                Signal4 = {
+                    SignalName = DCN
+                    SignalType = float
+                }
+                Signal5 = {
+                    SignalName = IPLA
+                    SignalType = float
+                }
+		Signal6 = {
+                    SignalName = VM
+                    SignalType = float
+                }
+                Signal7 = {
+                    SignalName = VL
+                    SignalType = float
+                }
+		Signal8 = {
+                    SignalName = VS01
+                    SignalType = float
+                }
+		Signal9 = {
+                    SignalName = VS02
+                    SignalType = float
+                }
+		Signal10 = {
+                    SignalName = VS03
+                    SignalType = float
+                }
+		Signal11 = {
+                    SignalName = VS04
+                    SignalType = float
+                }
+		Signal12 = {
+                    SignalName = VS05
+                    SignalType = float
+                }
+		Signal13 = {
+                    SignalName = VS06
+                    SignalType = float
+                }
+		Signal14 = {
+                    SignalName = VS07
+                    SignalType = float
+                }
+		Signal15 = {
+                    SignalName = VS08
+                    SignalType = float
+                }
+		Signal16 = {
+                    SignalName = VS09
+                    SignalType = float
+               }
+		Signal17 = {
+                    SignalName = VS10
+                    SignalType = float 
+                }
+		Signal18 = {
+                    SignalName = VS11
+                    SignalType = float
+                }
+		Signal19 = {
+                    SignalName = VS12
+                    SignalType = float
+                }
+		Signal20 = {
+                    SignalName = VS13
+                    SignalType = float 
+                }
+		Signal21 = {
+                    SignalName = VS14
+                    SignalType = float
+                }
+		Signal22 = {
+                    SignalName = VS15
+                    SignalType = float
+		}
+		Signal23 = {
+                    SignalName = VS16
+                    SignalType = float
+                }
+		Signal24 = {
+                    SignalName = VB01
+                    SignalType = float
+                }
+		Signal25 = {
+                    SignalName = VB02
+                    SignalType = float
+                }
+		Signal26 = {
+                    SignalName = VB03
+                    SignalType = float
+              }
+		Signal27 = {
+                    SignalName = VB04
+                    SignalType = float
+                }
+		Signal28 = {
+                    SignalName = VB05
+                    SignalType = float
+                }
+		Signal29 = {
+                    SignalName = VB06
+                    SignalType = float
+              }
+		Signal30 = {
+                    SignalName = VB07
+                    SignalType = float
+                }
+		Signal31 = {
+                    SignalName = VB08
+                    SignalType = float
+                }
+		Signal32 = {
+                    SignalName = VB09
+                    SignalType = float
+               }
+		Signal33 = {
+                    SignalName = VB10
+                    SignalType = float
+                }
+		Signal34 = {
+                    SignalName = VB11
+                    SignalType = float
+                }
+		Signal35 = {
+                    SignalName = VB12
+                    SignalType = float
+                }
+		Signal36 = {
+                    SignalName = VB13
+                    SignalType = float
+                }
+		Signal37 = {
+                    SignalName = VB14
+                    SignalType = float
+                }
+		Signal38 = {
+                    SignalName = VB15
+                    SignalType = float
+                }
+		Signal39 = {
+                    SignalName = VB16
+                    SignalType = float
+                }
+                
+		SignalALFPrep = {
+                    SignalName = ifPrep
+                    SignalType = float
+               }
+		SignalALHPrep = {
+                    SignalName = ihPrep
+                    SignalType = float
+                }
+		SignalALTPrep = {
+                    SignalName = itPrep
+                    SignalType = float
+                }
+		SignalALVPrep = {
+                    SignalName = ivPrep
+                    SignalType = float
+                }
+                SignalIPRif = {
+                        SignalName = ipRif
+                        SignalType = float
+                }
+                SignalTenVp = {
+                         SignalName = FBTenVp
+                         SignalType = float
+                }
+                SignalAdmBp = {
+                        SignalName = FBAdmBp
+                        SignalType = float
+                }
+	        Signal2 = {
+                    SignalName = FBINA_M_RIS
+                    SignalType = float
+                }
+		Signald3 = {
+                    SignalName = ZFM_I
+                    SignalType = float 
+                }
+		Signald4 = {
+                    SignalName = FBRPI_M_LUN
+                    SignalType = float
+                }
+		Signald5 = {
+                    SignalName = FBRPE_M_LUN
+                    SignalType = float              
+		 }
+		Signald6 = {
+                    SignalName = FBIP_M_I
+                    SignalType = float
+                }
+		Signald7 = {
+                    SignalName = FBMCIBC_M_I
+                    SignalType = float 
+                }
+              
+	       	Signal235 = {
+                    SignalName = VLOOP
+                    SignalType = float
+                }
+		Signal230 = {
+                    SignalName = NEUFC02
+                    SignalType = float
+                }	
+	        Signal224 = {
+                    SignalName = PKR1_
+                    SignalType = float
+                }
+		Signal225 = {
+                    SignalName = AVALPOLM3
+                    SignalType = float
+                }
+		Signal226 = {
+                    SignalName = AVALPOLM4
+                    SignalType = float
+                }
+		Signal227 = {
+                    SignalName = AVALPOLM1
+                    SignalType = float
+                }
+		Signal228 = {
+                    SignalName = AVALPOLM2
+                    SignalType = float
+                }
+		Signal229 = {
+                    SignalName = PKR2_
+                    SignalType = float
+               }
+		Signal231 = {
+                    SignalName = RADIV8
+                    SignalType = float
+                }
+		Signal232 = {
+                    SignalName = RADIV9
+                    SignalType = float
+               }
+		Signal233 = {
+                    SignalName = RADIV10
+                    SignalType = float
+                }
+		Signal234 = {
+                    SignalName = RADIV11
+                    SignalType = float
+                }
+	        SignalRIRIF = {
+                    SignalName = riRif
+                    SignalType = float
+                }
+                SignalRERIF = {
+                    SignalName = reRif
+                    SignalType = float
+                }
+                SignalZLRIF = {
+                    SignalName = zlRif
+                    SignalType = float
+                }
+                SignalZURIF = {
+                    SignalName = zuRif
+                    SignalType = float
+                }
+	
+                SignalDEPload = {
+                    SignalName = ZTM_I
+                    SignalType = float
+                }
+           }
+          
+          
+     } 
+
+
+
+	+Filters = {		// Chebyshev type II 20-50 Hz 
+	    	Class = DigitalFilterGAM::DigitalFilterGAM
+	    	+PressureFilter1 = {
+			Class = FilterContainer::FilterContainer
+			Numerator        = {9.023642222514556e-5  9.023642222514556e-5 0.0}
+				Denominator      = {1.0 -8.566288068182120e-1 0.0}
+			InputSignals = {
+		    		InputSignal1 = {
+		        		SignalName = PKR1
+	     	        		SignalType = float
+		    		}
+				InputSignal2 = {
+		        		SignalName = AVALPOLM3
+	     	        		SignalType = float
+		    		}
+				InputSignal7 = {
+		        		SignalName = AVALPOLM2
+	     	        		SignalType = float
+		    		}
+				InputSignal8 = {
+		        		SignalName = AVALPOLM4
+	     	        		SignalType = float
+		    		}
+				
+				InputSignal9 = {
+		        		SignalName = VM
+	     	        		SignalType = float
+		    		}
+			
+			}
+			OutputSignals = {
+		   		OutputSignal1 = {
+					SignalName = PKR1_F1
+					SignalType = float
+		    		}
+				
+		   		OutputSignal2 = {
+					SignalName = AVALPOLM3_F1
+					SignalType = float
+		    		}
+
+		   		OutputSignal3 = {
+					SignalName = AVALPOLM2_F1
+					SignalType = float
+		    		}
+
+		   		OutputSignal4 = {
+					SignalName = AVALPOLM4_F1
+					SignalType = float
+		    		}
+
+		   		OutputSignal5 = {
+					SignalName = VM_F1
+					SignalType = float
+		    		}
+			}
+	    	}
+	   	+PressureFilter2 = {
+			Class = FilterContainer::FilterContainer
+			Numerator        = {1.0 -1.575381571885469 1.0}
+				Denominator      = {1.0 -1.747224351199898 7.671792154974392e-1}
+			InputSignals = {
+		    	    InputSignal2 = {
+		        	SignalName = PKR1_F1
+	     	        	SignalType = float
+		    	     }
+				InputSignal1 = {
+		        		SignalName = AVALPOLM3_F1
+	     	        		SignalType = float
+		    		}
+
+				InputSignal7 = {
+		        		SignalName = AVALPOLM2_F1
+	     	        		SignalType = float
+		    		}
+				InputSignal8 = {
+		        		SignalName = AVALPOLM4_F1
+	     	        		SignalType = float
+		    		}
+				InputSignal9 = {
+		        		SignalName = VM_F1
+	     	        		SignalType = float
+		    		}
+			
+			}
+			OutputSignals = {
+		    		OutputSignal2 = {
+					SignalName = PKR1_F2
+					SignalType = float
+		    		}
+				
+		   		OutputSignal1 = {
+					SignalName = AVALPOLM3_F2
+					SignalType = float
+		    		}
+
+		   		OutputSignal3 = {
+					SignalName = AVALPOLM2_F2
+					SignalType = float
+		    		}
+
+		   		OutputSignal4 = {
+					SignalName = AVALPOLM4_F2
+					SignalType = float
+		    		}
+		   		OutputSignal5 = {
+					SignalName = VM_F2
+					SignalType = float
+		    		}
+			}
+	    	}
+	    	+PressureFilter3 = {
+			Class = FilterContainer::FilterContainer
+			Numerator        = {1.0 -1.858858184763483 9.999999999999996e-1}
+				Denominator      = {1.0 -1.828941078401525 8.477924771072456e-1}
+			InputSignals = {
+		  	       InputSignal3 = {
+		        	SignalName = PKR1_F2
+	     	        	SignalType = float
+		    		}
+				InputSignal1 = {
+		        		SignalName = AVALPOLM3_F2
+	     	        		SignalType = float
+		    		}
+				InputSignal7 = {
+		        		SignalName = AVALPOLM2_F2
+	     	        		SignalType = float
+		    		}
+				InputSignal8 = {
+		        		SignalName = AVALPOLM4_F2
+	     	        		SignalType = float
+		    		}
+				InputSignal9 = {
+		        		SignalName = VM_F2
+	     	        		SignalType = float
+		    		}
+			
+			}
+			OutputSignals = {
+		    		OutputSignal3 = {
+					SignalName = PKR1_F3
+					SignalType = float
+		    		}
+				
+		   		OutputSignal1 = {
+					SignalName = AVALPOLM3_F3
+					SignalType = float
+		    		}
+				
+		   		OutputSignal5 = {
+					SignalName = AVALPOLM2_F3
+					SignalType = float
+		    		}
+
+		   		OutputSignal4 = {
+					SignalName = AVALPOLM4_F3
+					SignalType = float
+		    		}
+		   		OutputSignal6 = {
+					SignalName = VM_F3
+					SignalType = float
+		    		}
+
+			}
+	    	}
+	    	+PressureFilter4 = {
+			Class = FilterContainer::FilterContainer
+			Numerator        = {1.0 -1.908073463141810 9.999999999999999e-1}
+				Denominator      = {1.0 -1.928441028245387 9.468764485065889e-1}
+			InputSignals = {
+		    		InputSignal4 = {
+		        		SignalName = PKR1_F3
+	     	        		SignalType = float
+		    		}
+				InputSignal1 = {
+		        		SignalName = AVALPOLM3_F3
+	     	        		SignalType = float
+		    		}
+				
+				InputSignal7 = {
+		        		SignalName = AVALPOLM2_F3
+	     	        		SignalType = float
+		    		}
+				InputSignal8 = {
+		        		SignalName = AVALPOLM4_F3
+	     	        		SignalType = float
+		    		}
+
+				InputSignal9 = {
+		        		SignalName = VM_F3
+	     	        		SignalType = float
+		    		}
+			}
+			OutputSignals = {
+		    		OutputSignal4 = {
+					SignalName = PKR1_FV
+					SignalType = float
+		    		}
+
+		   		OutputSignal1 = {
+					SignalName = AVALPOLM3_F
+					SignalType = float
+		    		}
+				
+		   		OutputSignal3 = {
+					SignalName = AVALPOLM2_F
+					SignalType = float
+		    		}
+
+		   		OutputSignal5 = {
+					SignalName = AVALPOLM4_F
+					SignalType = float
+		    		}
+				
+		   		OutputSignal6 = {
+					SignalName = VM_F
+					SignalType = float
+		    		}
+			}
+	    	}
+		
+	    	+MagneticMeasFilter = {
+			Class = FilterContainer::FilterContainer
+			SamplingTime = 0.0005
+			//Zeros        = {1.0}
+			Poles      = {1000.0}
+			InputSignals = {
+				Signal8 = {
+				    SignalName = VS01
+				    SignalType = float
+
+				}
+				Signal9 = {
+				    SignalName = VS02
+				    SignalType = float
+
+				}
+				Signal10 = {
+				    SignalName = VS03
+				    SignalType = float
+
+				}
+				Signal11 = {
+				    SignalName = VS04
+				    SignalType = float
+
+				}
+				Signal12 = {
+				    SignalName = VS05
+				    SignalType = float
+
+				}
+				Signal13 = {
+				    SignalName = VS06
+				    SignalType = float
+
+				}
+				Signal14 = {
+				    SignalName = VS07
+				    SignalType = float
+
+				}
+				Signal15 = {
+				    SignalName = VS08
+				    SignalType = float
+
+				}
+				Signal16 = {
+				    SignalName = VS09
+				    SignalType = float
+				}
+				Signal17 = {
+				    SignalName = VS10
+				    SignalType = float 
+
+				}
+				Signal18 = {
+				    SignalName = VS11
+				    SignalType = float
+
+				}
+				Signal19 = {
+				    SignalName = VS12
+				    SignalType = float
+
+				}
+				Signal20 = {
+				    SignalName = VS13
+				    SignalType = float 
+
+				}
+				Signal21 = {
+				    SignalName = VS14
+				    SignalType = float
+
+				}
+				Signal22 = {
+				    SignalName = VS15
+				    SignalType = float
+				
+				}
+				Signal23 = {
+				    SignalName = VS16
+				    SignalType = float
+				}
+				Signal24 = {
+				    SignalName = VB01
+				    SignalType = float
+				}
+				Signal25 = {
+				    SignalName = VB02
+				    SignalType = float
+				}
+				Signal26 = {
+				    SignalName = VB03
+				    SignalType = float
+				}
+				Signal27 = {
+				    SignalName = VB04
+				    SignalType = float
+				}
+				Signal28 = {
+				    SignalName = VB05
+				    SignalType = float
+				}
+				Signal29 = {
+				    SignalName = VB06
+				    SignalType = float
+				}
+				Signal30 = {
+				    SignalName = VB07
+				    SignalType = float
+				}
+				Signal31 = {
+				    SignalName = VB08
+				    SignalType = float
+				}
+				Signal32 = {
+				    SignalName = VB09
+				    SignalType = float
+				}
+				Signal33 = {
+				    SignalName = VB10
+				    SignalType = float
+				}
+				Signal34 = {
+				    SignalName = VB11
+				    SignalType = float
+				}
+				Signal35 = {
+				    SignalName = VB12
+				    SignalType = float
+				}
+				Signal36 = {
+				    SignalName = VB13
+				    SignalType = float
+				}
+				Signal37 = {
+				    SignalName = VB14
+				    SignalType = float
+				}
+				Signal38 = {
+				    SignalName = VB15
+				    SignalType = float
+				}
+				Signal39 = {
+				    SignalName = VB16
+				    SignalType = float
+				}
+			}
+
+			OutputSignals = {
+				Signal38 = {
+				    SignalName = VSF1[16]
+				    SignalType = float
+				}
+				Signal39 = {
+				    SignalName = VBF1[16]
+				    SignalType = float
+				}	
+			}
+	    	}
+		+MagneticMeasFilter2 = {
+			Class = FilterContainer::FilterContainer
+			SamplingTime = 0.0005
+			//Zeros        = {1.0}
+			Poles      = {20}
+			InputSignals = {
+				Signal8 = {
+				    SignalName = VM
+				    SignalType = float
+
+				}
+			}
+
+			OutputSignals = {
+				Signal38 = {
+				    SignalName = VM_LP
+				    SignalType = float
+				}
+			}
+
+	    	}
+         }
+	+PKREngGam1 = {
+	  Version = "$Id: MARTe-TestStreaming.cfg,v 1.4 2009/03/20 15:22:55 ppcc_dev Exp $"
+	  Class = EngineeringGAM
+	  InputSignals = {
+		input = {
+		    SignalName = EngineeringIn
+		    SignalType = EngineeringGAMInputStructure
+		    FlatNamed  = True
+		}
+	    }
+	    OutputSignals = {
+		output = {
+		    SignalName = EngineeringOut
+		    SignalType = EngineeringGAMOutputStructure
+		    FlatNamed  = True
+		}
+	    }
+
+	    Remappings={
+	    	InputInterface={
+			analogOutputGauge = ZEROWAVE
+			}
+	    	OutputInterface={
+			lowVacuumPressure = PKR1
+			dcnFeedback = PKR1_DEN
+		}
+
+	    }
+	    
+	    ExaAvogadro=6.02214179e+5
+            GasType=2.4            //Deuterio-Idroggeno
+		
+	}
+
+
+
+	+PKREngGam2 = {
+	  Version = "$Id: MARTe-TestStreaming.cfg,v 1.4 2009/03/20 15:22:55 ppcc_dev Exp $"
+	  Class = EngineeringGAM
+	  InputSignals = {
+		input = {
+		    SignalName = EngineeringIn
+		    SignalType = EngineeringGAMInputStructure
+		    FlatNamed  = True
+		}
+	    }
+	    OutputSignals = {
+		output = {
+		    SignalName = EngineeringOut
+		    SignalType = EngineeringGAMOutputStructure
+		    FlatNamed  = True
+		}
+	    }
+
+	    Remappings={
+	    	InputInterface={
+			analogOutputGauge = ZEROWAVE
+			}
+	    	OutputInterface={
+			lowVacuumPressure = PKR2
+			dcnFeedback = PKR2_DEN
+		}
+
+	    }
+	    
+	    ExaAvogadro=6.02214179e+5
+            GasType=2.4
+	}
+
+
+
+     +MomentsGAM = {
+	  Class = MomentsGAM
+    	  
+	  InputSignals = {
+		input = {
+		    SignalName = MomentsIn
+		    SignalType = MomentsGAMInputStructure
+		    FlatNamed  = True
+		}
+	    }
+	    OutputSignals = {
+		output = {
+		    SignalName = MomentsOut
+		    SignalType = MomentsGAMOutputStructure
+		    FlatNamed  = True
+		}
+	    }
+
+	   Remappings={
+	    	InputInterface={
+			time = usecTime
+		        vl=VL
+                        vm=VM_F
+                       	sa01=VS01
+			sa02=VS02
+			sa03=VS03
+			sa04=VS04
+			sa05=VS05
+			sa06=VS06
+			sa07=VS07
+			sa08=VS08
+			sa09=VS09
+			sa10=VS10
+			sa11=VS11
+			sa12=VS12
+			sa13=VS13
+			sa14=VS14
+			sa15=VS15
+			sa16=VS16
+
+			bp01=VB01
+			bp02=VB02
+			bp03=VB03
+			bp04=VB04
+			bp05=VB05
+			bp06=VB06
+			bp07=VB07
+			bp08=VB08
+			bp09=VB09
+			bp10=VB10
+			bp11=VB11
+			bp12=VB12
+			bp13=VB13
+			bp14=VB14
+			bp15=VB15
+			bp16=VB16
+
+
+		}
+
+		OutputInterface={
+			mec0 = MEC0
+			mec1 = MEC1
+			mec2 = MEC2
+			mec3 = MEC3
+			mes0 = MES0
+			mes1 = MES1
+			mes2 = MES2
+			mes3 = MES3
+			mic0 = MIC0
+			mic1 = MIC1
+			mic2 = MIC2
+			mic3 = MIC3
+			mis0 = MIS0
+			mis1 = MIS1
+			mis2 = MIS2
+			mis3 = MIS3
+			ipl = IPL	
+			reRif1=reRif1
+		}
+
+	    }
+	
+	UseZeroShotData=1
+	ZeroShotDataFile="/home/luca/code/MARTe/TestArea/zero_actual.dat" 
+          
+	OffsetCalulationStartTime=8000000
+	OffsetCalulationTime=100000
+	IntegrationCostStartTime=8570000
+	IntegrationCostStopTime=8580000
+	ToroidalFieldCalulationStartTime=8800000
+	ToroidalFieldCalulationTime=200000
+	MomentCalculationStartTime=9000500	
+	MomentCalculationStopTime= 11899999 //15500000
+	
+	
+	
+	}
+
+  +SynchOutputGAM = {
+            Class = IOGAMs::OutputGAM
+            UsecTimeSignalName = usecTime
+            BoardName = SynchBoard
+            Signals = {
+                cycleUsecTime = {
+                    SignalName = usecTime
+                    SignalType = int32
+                }
+		mec0 = {
+	            SignalName = MEC0
+	            SignalType = float
+	        }
+		mec1 = {
+	            SignalName = MEC1
+	            SignalType = float
+	        }
+		mec2 = {
+	            SignalName = MEC2
+	            SignalType = float
+	        }
+		mec3 = {
+	            SignalName = MEC3
+	            SignalType = float
+	        }
+		mic0 = {
+	            SignalName = MIC0
+	            SignalType = float
+	        }
+		mic1 = {
+	            SignalName = MIC1
+	            SignalType = float
+	        }
+		mic2 = {
+	            SignalName = MIC2
+	            SignalType = float
+	        }
+		mic3 = {
+	            SignalName = MIC3
+	            SignalType = float
+	        }
+		mes0 = {
+	            SignalName = MES0
+	            SignalType = float
+	        }
+		mes1 = {
+	            SignalName = MES1
+	            SignalType = float
+	        }
+		mes2 = {
+	            SignalName = MES2
+	            SignalType = float
+	        }
+		mes3 = {
+	            SignalName = MES3
+	            SignalType = float
+	        }
+		mis0 = {
+	            SignalName = MIS0
+	            SignalType = float
+	        }
+		mis1 = {
+	            SignalName = MIS1
+	            SignalType = float
+	        }
+		mis2 = {
+	            SignalName = MIS2
+	            SignalType = float
+	        }
+		mis3 = {
+	            SignalName = MIS3
+	            SignalType = float
+	        }
+            }
+        }
+
+        +ExtSeek = {
+                Class = ExtSeekingGAM
+                Filters = { 
+                            SamplingTime = 0.0005 	//cambiare poi con 0.0005
+	                    Tau1 = 0.01
+	                    Tau2 = 0.01
+	                    K = 1.0 
+	                }
+                GainK1 = 0.02				// provare poi con k1=0.02 e k2=0.06
+                GainK2 = 0.06
+                TStart = 0.28
+                TStop = 1.8
+                MaxAbsoluteTheta = 0.005
+                MinAbsoluteTheta = -0.005
+                ZeroTime = 10
+
+
+            InputSignals = {
+
+                input = {
+                    SignalName = ExtSeekingIn
+                    SignalType = ExtSeekingGAMInputStructure
+                    FlatNamed  = True
+                }
+	    }
+            OutputSignals = {
+                output = {
+                    SignalName = ExtSeekingOut
+                    SignalType = ExtSeekingGAMOutputStructure
+                    FlatNamed  = True
+                }
+            }
+
+            Remappings = {
+                InputInterface = {
+                    rs2 = rs2
+                    PotPer = POTPER
+                    reRif = reRif
+                    time = usecTime
+                }
+                OutputInterface = {
+                   Delta_Re_Rif = Delta_Re_Rif
+                   ExSeek_Re_Rif = ExSeek_Re_Rif
+                }
+            }
+
+            ControllerOn  = ON
+        }
+
+     	+Safety = {
+        	Class = SafetyGAM
+
+		UsecsBeforeRunaway=10000 
+		UsecsBeforeChkDisruption=10300000
+		UsecsBeforePlateau=8000
+		PlasmaCurrentDerivativeThreshold=0.75E7
+		PlasmaCurrentDropThreshold=0.85
+		HardXRunawayThreshold=0.200000
+		NewRunawayCurrentDump=ON  //OFF
+	        FBSC1=1.000000
+		MinPlasmaCurrent=80
+		IFRefDropThreshold=5000
+		HysteresisDipla=0.8
+
+		+IplMeasDerivator = {
+			Class = PseudoDerivator
+			WindowSize=4
+			SubWindowsSize=2	
+
+		}
+
+		+FastIplDerivator = {
+			Class = PseudoDerivator
+			WindowSize=4
+			SubWindowsSize=2	
+
+		}
+
+		+SlowIplDerivator = {
+			Class = PseudoDerivator
+			WindowSize=26
+			SubWindowsSize=4	
+		}
+
+		+IplRif1SlowDerivator = {
+			Class = PseudoDerivator
+			WindowSize=26
+			SubWindowsSize=4	
+		}
+
+		+RunawayReferenceGen={
+			Class = RunawayPrepGen
+		    	RunawayUsecTimefPlateau=11200000
+			MaxDDRe=4.0e-3
+			RunawayPlateauDeIpMax= 3.9e6
+			RunawayDeltaPlateau=300000
+			DesideredRBari=0.87
+			DistanceFromBari=0.01
+			MaxReRifDistance=0.22
+			CBariMax=0.10
+			MinBari=0.82
+			MaxBari=0.96
+			K1= 0.1
+			K2=0.75 
+			K3=1.8E6 
+			FinalDropDeIpMax=5.0e6
+			FinalDropPlasmaCurrent=58000
+		
+		}
+		
+		+ReRifGenPrep = {
+			Class = ReRifRunawayGenerator
+			RextDesFixed=1.13 //the r_ext desired as default, to start with
+			SatGamma1=0.20 //threshold for the gamma1(Ip) values
+			SatGamma2=0.20 //threshold for the gamma2(neufc02) values
+			SatDeGamma1=0.005 //threshold for the d gamma1/dt values for sampling time
+			SatDeGamma2=0.0015 //threshold for the d gamma2/dt values for sampling time
+			DeadzoneDeRextGamma2= 2.5
+			DeadzoneDeNeuGamma2=1.0E15
+			SatRextLow= 0.95
+			SatRextHigh= 1.20
+			K1Gamma2= 1.E-16
+			ThresholdNeuGamma2= 0.25E13 //se neufc basso non toccare nulla
+			ThresholdVloopGamma2= 7.0  //se vloop maggiore non fai niente con gamma2
+			ThresholdRextError= 0.06  //se new_rerif-rs2 troppo grande ma nel verso dove l'extremum direbbe di andare allora non fare niente
+			MinPlasmaCurrent= 58000
+			FinalAlphaRunaway= 0.9 
+			RextRinalKick = 1.16 //last position when current below Ip_min
+		
+			InputSignals ={
+				signal1 = {
+				    SignalName = usecTime
+				    SignalType = int32
+				}
+				signal2 = {
+				    SignalName = runaway
+				    SignalType = int32
+				}
+				signal3 = {
+				    SignalName = runawayPlateau
+				    SignalType = int32
+				}
+				signal4 = {
+				    SignalName = IPL
+				    SignalType = float
+				}
+/*
+				signal5 = {
+				    SignalName = reRif
+				    SignalType = float
+				}*/
+				signal6 = {
+				    SignalName = rs2
+				    SignalType = float
+				}
+				signal7 = {
+				    SignalName = VLOOP
+				    SignalType = float
+				}
+				signal8 = {
+				    SignalName = NEUFC02
+				    SignalType = float
+				}
+				signal9 = {
+				    SignalName = xiRextGamma
+				    SignalType = float
+				}
+				signal10 = {
+				    SignalName = xiRextGamma2
+				    SignalType = float
+				}
+				signal11 = {
+				    SignalName = xiRext
+				    SignalType = float
+				}
+			   }
+			OutputSignals = { 
+				signal4 = {
+				    SignalName = temp
+				    SignalType = float
+				}
+				signal6 = {
+				    SignalName = deRs2
+				    SignalType = float
+				}
+				signal7 = {
+				    SignalName = deVLOOP
+				    SignalType = float
+				}
+				signal8 = {
+				    SignalName = deNeu
+				    SignalType = float
+				}
+		    		signal9 = {
+				    SignalName = xiRextGamma
+				    SignalType = float
+				}
+				signal10 = {
+				    SignalName = xiRextGamma2
+				    SignalType = float
+				}
+				signal11 = {
+				    SignalName = xiRext
+				    SignalType = float
+				}
+				signal12 = {
+				    SignalName = reRif2
+				    SignalType = float
+				}
+		      }
+
+		      +Rs2Derivator = {
+			      Class = PseudoDerivator
+			      WindowSize=9
+			      SubWindowsSize=2
+			}
+		      +VloopDerivator = {
+				Class = PseudoDerivator
+				WindowSize=3
+				SubWindowsSize=1
+			}
+			+NeuDerivator = {
+				Class = PseudoDerivator
+				WindowSize=16
+				SubWindowsSize=6
+			}
+		}	
+		
+		InputSignals = {
+			input = {
+			    SignalName = SafetyGAMIn
+			    SignalType = SafetyGAMInputStructure
+			    FlatNamed  = True
+			}
+		}
+		OutputSignals = {
+			output = {
+			    SignalName = SafetyGAMOut
+			    SignalType = SafetyGAMOutputStructure
+			    FlatNamed  = True
+			}
+		}
+		
+		Remappings={
+			InputInterface={
+				hardXMeasure=FBINA_M_RIS
+				perssure=PKR1
+				dcn=DCN
+				ipl=IPL
+				iplmeas=FBIP_M_I
+				
+   
+			}
+		        OutputInterface={		
+				
+				   
+			}
+		
+		}
+	}
+
+
+	+LcsmGAM = {
+	  	Class = LcsmGAM
+                SyncBoardName = MARTe.DriverPool.TimerBoard
+	        TStart=10.0
+                TStop=11.6
+		+Mesh1={
+			Class = Mesh
+			nTheta = 64
+			nOmega = 64
+			R = 1.22500
+			Z = 0.00000 
+		}
+	+Mesh2={
+			Class = Mesh
+			nTheta = 64
+			nOmega = 64
+			R = 1.21800
+			Z = 0.06300 
+		}
+	+Mesh3={
+			Class = Mesh
+			nTheta = 64
+			nOmega = 64
+			R = 1.20000
+			Z = 0.12000 
+		}
+	+Mesh4={
+			Class = Mesh
+			nTheta = 64
+			nOmega = 64
+			R = 1.17100
+			Z = 0.17200 
+		}
+	+Mesh5={
+			Class = Mesh
+			nTheta = 64
+			nOmega = 64
+			R = 0.68000
+			Z = 0.16000 
+		}
+	+Mesh6={
+			Class = Mesh
+			nTheta = 64
+			nOmega = 64
+			R = 0.67200
+			Z = 0.13100 
+		}
+	+Mesh7={
+			Class = Mesh
+			nTheta = 64
+			nOmega = 64
+			R = 0.65300
+			Z = 0.06800 
+		}
+	+Mesh8={
+			Class = Mesh
+			nTheta = 64
+			nOmega = 64
+			R = 0.64500
+			Z = 0.00000 
+		}
+	+Mesh9={
+			Class = Mesh
+			nTheta = 64
+			nOmega = 64
+			R = 0.65300
+			Z = -0.06800 
+		}
+	+Mesh10={
+			Class = Mesh
+			nTheta = 64
+			nOmega = 64
+			R = 0.67200
+			Z = -0.13100 
+		}
+	+Mesh11={
+			Class = Mesh
+			nTheta = 64
+			nOmega = 64
+			R = 0.68000
+			Z = -0.16000 
+		}
+	+Mesh12={
+			Class = Mesh
+			nTheta = 64
+			nOmega = 64
+			R = 0.81900
+			Z = -0.30990 
+		}
+	+Mesh13={
+			Class = Mesh
+			nTheta = 64
+			nOmega = 64
+			R = 0.86600
+			Z = -0.32170 
+		}
+	+Mesh14={
+			Class = Mesh
+			nTheta = 64
+			nOmega = 64
+			R = 0.91300
+			Z = -0.33340 
+		}
+	+Mesh15={
+			Class = Mesh
+			nTheta = 64
+			nOmega = 64
+			R = 0.92300
+			Z = -0.33290 
+		}
+	+Mesh16={
+			Class = Mesh
+			nTheta = 64
+			nOmega = 64
+			R = 0.96650
+			Z = -0.32830 
+		}
+	+Mesh17={
+			Class = Mesh
+			nTheta = 64
+			nOmega = 64
+			R = 1.01000
+			Z = -0.32370 
+		}
+	+Mesh18={
+			Class = Mesh
+			nTheta = 64
+			nOmega = 64
+			R = 1.02000
+			Z = -0.32220 
+		}
+	+Mesh19={
+			Class = Mesh
+			nTheta = 64
+			nOmega = 64
+			R = 1.06350
+			Z = -0.30000 
+		}
+	+Mesh20={
+			Class = Mesh
+			nTheta = 64
+			nOmega = 64
+			R = 1.10700
+			Z = -0.27780 
+		}
+	+Mesh21={
+			Class = Mesh
+			nTheta = 64
+			nOmega = 64
+			R = 1.17100
+			Z = -0.17200 
+		}
+	+Mesh22={
+			Class = Mesh
+			nTheta = 64
+			nOmega = 64
+			R = 1.20000
+			Z = -0.12000 
+		}
+	+Mesh23={
+			Class = Mesh
+			nTheta = 64
+			nOmega = 64
+			R = 1.21800
+			Z = -0.06300 
+		}
+
+/*
+        +Mesh1={                                       
+                        Class = Mesh                
+                        nTheta = 64                 
+                        nOmega = 64                 
+                        R = 1.23500                 
+                        Z = 0.00000                 
+                }                                   
+        +Mesh2={                                    
+                        Class = Mesh                
+                        nTheta = 64                  
+                        nOmega = 64                 
+                        R = 1.22800                 
+                        Z = 0.06300                 
+                }                     
+        +Mesh3={                                    
+                        Class = Mesh                
+                        nTheta = 64                 
+                        nOmega = 64                 
+                        R = 1.21000                 
+                        Z = 0.12000   
+                }                                                                                                                              
+        +Mesh4={                    
+                        Class = Mesh
+                        nTheta = 64            
+                        nOmega = 64 
+                        R = 1.18100 
+                        Z = 0.17200 
+                }                   
+        +Mesh5={                       
+                        Class = Mesh
+                        nTheta = 64 
+                        nOmega = 64 
+                        R = 0.68000            
+                        Z = 0.16000 
+                }                   
+        +Mesh6={                    
+                        Class = Mesh           
+                        nTheta = 64                                                      
+                        nOmega = 64 
+                        R = 0.67200 
+                        Z = 0.13100            
+                }                           
+	+Mesh7={                       
+                        Class = Mesh            
+                        nTheta = 64 
+                        nOmega = 64 
+                        R = 0.65300 
+                        Z = 0.06800 
+                }                        
+        +Mesh8={                    
+                        Class = Mesh                 
+                        nTheta = 64 
+                        nOmega = 64 
+                        R = 0.64500 
+                        Z = 0.00000 
+                }                   
+        +Mesh9={                    
+                        Class = Mesh
+                        nTheta = 64 
+                        nOmega = 64                 
+                        R = 0.65300 
+                        Z = -0.06800                                                                                                           
+                }                   
+        +Mesh10={                   
+                        Class = Mesh           
+                        nTheta = 64 
+                        nOmega = 64 
+                        R = 0.67200 
+                        Z = -0.13100
+                }                      
+        +Mesh11={                   
+                        Class = Mesh
+                        nTheta = 64 
+                        nOmega = 64            
+                        R = 0.68000 
+                        Z = -0.16000
+                }                   
+        +Mesh12={                              
+                        Class = Mesh                                                     
+                        nTheta = 64 
+                        nOmega = 64 
+                        R = 0.81900            
+                        Z = -0.29490                                         
+                }  
+        +Mesh13={                                                      
+                        Class = Mesh   
+                        nTheta = 64             
+                        nOmega = 64 
+                        R = 0.86600 
+                        Z = -0.30670
+                }                   
+        +Mesh14={                        
+                        Class = Mesh
+                        nTheta = 64                  
+                        nOmega = 64 
+                        R = 0.91300 
+                        Z = -0.31840
+                }                   
+        +Mesh15={                   
+                        Class = Mesh
+                        nTheta = 64 
+                        nOmega = 64 
+                        R = 0.92300                 
+                        Z = -0.31790
+                }                                                                                                                              
+        +Mesh16={                   
+                        Class = Mesh
+                        nTheta = 64            
+                        nOmega = 64 
+                        R = 0.96650 
+                        Z = -0.31330
+                }                   
+        +Mesh17={                      
+                        Class = Mesh
+                        nTheta = 64 
+                        nOmega = 64 
+                        R = 1.01000            
+                        Z = -0.30870
+                }                   
+        +Mesh18={                   
+                        Class = Mesh           
+                        nTheta = 64                                                      
+                        nOmega = 64 
+                        R = 1.02000 
+                        Z = -0.30720           
+                }  
+         +Mesh19={                                                      
+                        Class = Mesh   
+                        nTheta = 64             
+                        nOmega = 64 
+                        R = 1.06350 
+                        Z = -0.28500
+                }                   
+        +Mesh20={                        
+                        Class = Mesh
+                        nTheta = 64                  
+                        nOmega = 64 
+                        R = 1.10700 
+                        Z = -0.26280
+                }                   
+        +Mesh21={                   
+                        Class = Mesh
+                        nTheta = 64 
+                        nOmega = 64 
+                        R = 1.18100                 
+                        Z = -0.17200
+                }                                                                                                                              
+        +Mesh22={                   
+                        Class = Mesh
+                        nTheta = 64            
+                        nOmega = 64 
+                        R = 1.21000 
+                        Z = -0.12000
+                }                   
+        +Mesh23={                      
+                        Class = Mesh
+                        nTheta = 64 
+                        nOmega = 64 
+                        R = 1.22800            
+                        Z = -0.06300
+                }                                 	
+
+*/
+
+		
+
+		/*+Mesh1={
+			Class = Mesh
+			nTheta = 128
+			nOmega = 64
+			R = 0.68000
+			Z = 0.16000 
+		}
+
+		+Mesh2={
+			Class = Mesh
+			nTheta = 128
+			nOmega = 64
+			R = 0.67200
+			Z = 0.13100 
+		}
+
+		+Mesh3={
+			Class = Mesh
+			nTheta = 128
+			nOmega = 64
+			R = 0.65300
+			Z = 0.06800 
+		}
+
+		+Mesh4={
+			Class = Mesh
+			nTheta = 128
+			nOmega = 64
+			R = 0.64500
+			Z = 0.00000 
+		}
+
+		+Mesh5={
+			Class = Mesh
+			nTheta = 128
+			nOmega = 64
+			R = 0.65300
+			Z = -0.06800 
+		}
+
+		+Mesh6={
+			Class = Mesh
+			nTheta = 128
+			nOmega = 64
+			R = 0.67200
+			Z = -0.13100 
+		}
+
+		+Mesh7={
+			Class = Mesh
+			nTheta = 128
+			nOmega = 64
+			R = 0.68000
+			Z = -0.16000 
+		}
+
+		+Mesh8={
+			Class = Mesh
+			nTheta = 128
+			nOmega = 64
+			R = 0.81900
+			Z = -0.31990 
+		}
+
+		+Mesh9={
+			Class = Mesh
+			nTheta = 128
+			nOmega = 64
+			R = 0.86600
+			Z = -0.33170 
+		}
+
+		+Mesh10={
+			Class = Mesh
+			nTheta = 128
+			nOmega = 64
+			R = 0.91300
+			Z = -0.34340 
+		}
+
+		+Mesh11={
+			Class = Mesh
+			nTheta = 128
+			nOmega = 64
+			R = 0.92300
+			Z = -0.34290 
+		}
+
+		+Mesh12={
+			Class = Mesh
+			nTheta = 128
+			nOmega = 64
+			R = 0.96650
+			Z = -0.33830 
+		}
+
+		+Mesh13={
+			Class = Mesh
+			nTheta = 128
+			nOmega = 64
+			R = 1.01000
+			Z = -0.33370 
+		}
+
+		+Mesh14={
+			Class = Mesh
+			nTheta = 128
+			nOmega = 64
+			R = 1.02000
+			Z = -0.33220 
+		}
+
+		+Mesh15={
+			Class = Mesh
+			nTheta = 128
+			nOmega = 64
+			R = 1.06350
+			Z = -0.31000 
+		}
+
+		+Mesh16={
+			Class = Mesh
+			nTheta = 128
+			nOmega = 64
+			R = 1.10700
+			Z = -0.28780 
+		}*/
+
+
+
+
+	
+
+		InputSignals = {
+			input = {
+			    SignalName = LcsmIn
+			    SignalType = LcsmGAMInputStructure
+			    FlatNamed  = True
+			}
+		}
+		OutputSignals = {
+			output = {
+			    SignalName = LcsmOut
+			    SignalType = LcsmGAMOutputStructure
+			    FlatNamed  = True
+			}
+		}
+		
+		Remappings={
+			InputInterface={
+				mec0 = MEC0
+				mec1 = MEC1
+				mec2 = MEC2
+				mec3 = MEC3
+				mes1 = MES1
+				mes2 = MES2
+				mes3 = MES3
+				mic0 = MIC0
+				mic1 = MIC1
+				mic2 = MIC2
+				mic3 = MIC3
+				mis1 = MIS1
+				mis2 = MIS2
+				mis3 = MIS3
+                                reRif =reRif2 //ExSeek_Re_Rif
+					
+			}
+			OutputInterface={		
+				
+        
+			}
+			OutputInterface2={
+			
+			}
+		}
+	}
+
+        
+         +Controller = {
+                Class = ControllerGAM
+
+             Times = { 
+		        SamplingTime = 0.0005
+		        TstartA = -2.0
+		        TstartB = -1.5
+		        TstartC = -1.4
+		        TstartD = -1.0 
+		        TstartE = -0.01
+		        TstartF = -0.001
+		        TendFTU =  1.900000 //5.5
+			
+		        ZeroTime = 10
+	        }
+             ControllerOn = ON
+             FBSC1= 1.000000
+             FBSC2= 0.200000
+             FBSC3= 1.000000
+             FBSC4= 1.000000
+             FBSC5= 1.000000
+             FBCFR= -43500.000000
+	     FBKVUOK= 0.000000
+	     FBKVUOI= 0.000000
+	     FBKVUOD= 0.000000	
+             AllocatorOn = ON
+	     VerticalFieldsBalancerOn = ON
+	     FSchedulerOn = ON
+	     SwitchedDoubleIntegratorOn = OFF
+
+	     SaturateTAlways=True
+	     IFMin=2500.0     // linear range   +/-1.2KAmp
+	     MinPlasmaCurrent=80
+	     MinTimeMsForPlasma=80
+	     MinPlasmaCurrentLH=100
+             VBQuenchMaxDerivative=3.0
+             AllocatorQuenchMaxDerivative=1000.0
+             VBRunawayMaxDerivative=3.0
+             AllocatorRunawayMaxDerivative=1000.0
+	     MaxTDer=100
+	     MaxVDer=45
+	     MaxFDer=300
+	     MaxTDerAfterCommutation= 55
+            // ZFMCal0 = 2.845051389 se voglio campionare il toroidale invece che F
+
+	     +PIDALF = {
+
+	        Class = FTUPID
+                Tau = 0.004000
+                +KpWaveform = {
+                    Class = Waveform
+	            Rounding = 500
+                    Times = {10.000000 10.050000 11.600000 12.013280 12.400000 13.400000 }
+                    Amplitudes = {0.0000000000000 0.1500000059605 0.1500000059605 0.1500000059605 0.0000000000000 0.0000000000000 }
+                }
+                +KiWaveform = {
+                    Class = Waveform
+	            Rounding = 500
+                    Times = {10.000000 10.000000 10.160000 11.600000 12.007290 12.400000 13.400000 }
+                    Amplitudes = {0.0000000000000 2.4000000953674 20.0000000000000 20.0000000000000 20.0000000000000 0.0000000000000 0.0000000000000 }
+                }
+                +KdWaveform = {
+                    Class = Waveform
+	            Rounding = 500
+                    Times = {10.000000 10.200000 12.005500 12.200000 12.400000 13.400000 }
+                    Amplitudes = {0.0000000000000 0.0004499999923 0.0004499999923 0.0000000000000 0.0000000000000 0.0000000000000 }
+                }
+            }
+
+	     +PIDALF2 = {
+
+	        Class = FTUPID
+                Tau = 0.004000
+                +KpWaveform = {
+                    Class = Waveform
+	            Rounding = 500
+                    Times = {10.000000 10.050000 11.600000 12.013280 12.400000 13.400000 }
+                    Amplitudes = {0.0000000000000 0.1500000059605 0.1500000059605 0.1500000059605 0.0000000000000 0.0000000000000 }
+                }
+                +KiWaveform = {
+                    Class = Waveform
+	            Rounding = 500
+                    Times = {10.000000 10.000000 10.160000 11.600000 12.007290 12.400000 13.400000 }
+                    Amplitudes = {0.0000000000000 2.4000000953674 20.0000000000000 20.0000000000000 20.0000000000000 0.0000000000000 0.0000000000000 }
+                }
+                +KdWaveform = {
+                    Class = Waveform
+	            Rounding = 500
+                    Times = {10.000000 10.200000 12.005500 12.200000 12.400000 13.400000 }
+                    Amplitudes = {0.0000000000000 0.0004499999923 0.0004499999923 0.0000000000000 0.0000000000000 0.0000000000000 }
+                }
+            }
+	    
+	    +FGainsScaler = {
+
+	        Class = GainsScaler
+		Start=10200000 //200 ms
+		Stop= 15000000
+		SamplingTime=0.0005
+		IplSafetyPercent=0.15
+		InnerHysteresisThreshold=1200
+		OuterHysteresisThreshold=1600	
+		DwellTime=0.01
+		IFMsDelay=1
+		EpsilonDep=1000.0
+		Tau=0.7
+                
+		+KpGS = {
+                    Class = GainScaling
+	            NewGainPercentage=1.1
+		    TauHysteresis=0.6
+		}
+                +KiGS = {
+                    Class = GainScaling
+		    NewGainPercentage=0.5
+		    TauHysteresis=0.6
+		
+		}
+                +KdGS = {
+                    Class = GainScaling
+		    NewGainPercentage=1.4
+		    TauHysteresis=0.6
+		
+		}
+
+            }
+
+
+            +PIDALH = {
+                Class = FTUPID
+                Tau = 0.000000
+                +KpWaveform = {
+                    Class = Waveform
+	            Rounding = 500
+                    Times = {10.000000 10.005000 12.164330 12.200000 13.200000 }
+                    Amplitudes = {0.0000000000000 0.0000000000000 0.0000000000000 0.0000000000000 0.000000000000}
+                }
+                +KiWaveform = {
+                    Class = Waveform
+	            Rounding = 500
+                    Times = {10.000000 10.001000 10.005000 12.152500 12.200000 13.200000 }
+                    Amplitudes = {0.0000000000000 0.0000000000000 0.0000000000000 0.0000000000000 0.0000000000000 0.0000000000000 }
+                }
+                +KdWaveform = {
+                    Class = Waveform
+	            Rounding = 500
+                    Times = {10.000000 10.001000 11.148580 12.200000 13.200000 }
+                    Amplitudes = {0.0000000000000 0.0000000000000 0.0000000000000 0.0000000000000 0.0000000000000 }
+                }
+            }
+
+
+   +PIDALHe =
+
+	     {
+	       Class = FTUPIDEnanched
+	       Tau = 0.00
+	       SatAmplPID = 350.0   //1200.0 amplitude saturation
+	       SatDerPID = 40.0      //40.0 rate saturation per Ts
+	       DerDeadzonePID = 250.0  //250.0 deadzone of the derivative term
+	       TauFilterPID = 0.75   //0.75 input filter (of the error)
+	       
+	       StartTimeNonLinPID = 10.1 //time at which the nonlinear terms of the PID are activated
+	       EndTimeNonLinPID = 11.6 //time at which the nonlinear terms of the PID are deactivated
+
+	       Kd_error = 0.0004 // 4E-5 derivative term = (Kd + Kd_error*error )*d_error   
+	       Q_Kd_error = 1.0 // to activate the Kd_error if e*d_e>0
+	       Kd_2 = 0.002    //0.002 piecewise gain added to Kd of the stardard derivative PID term when the |d_erro| is larger than SigmaHpid1
+	       
+	  
+	       SwitchingH = 1.0 //To select the specific function of the PID (Hybrid or standard) ( =0.0 PID saturated, =!0.0 Hybrid)
+	       SigmaHpid1 = 1000.0 //800 when activate the rump
+	       SigmaHpid2 = 200.0 //when inibit the rump
+	       RampDerH = 4.0 //4.0 maximum ramp derivative, it should be <= satDerPID
+	       MaxSatH = 200.0 //maximum ramp value
+	       ErrorDeazoneH = 30.0 //20.0 ramp is not activated if error is below this threshold
+	       RampGainH = 0.0003 //0.0002 ramp slope, linear with the pseudoderivative
+	       RampGainHdez = 0.001 //0.002 ramp slope, that multiplies the dez (it is also multiplied by RampGainH*d_dez)
+	    
+		   +ErrorDerivator =
+		{
+		  Class = PseudoDerivator
+		  WindowSize=18
+		  SubWindowsSize=6
+		}
+
+		  +KpWaveform = {
+		            Class = Waveform
+			    Rounding = 500
+		            Times = {10.000000 10.005000 11.500000 11.550000 12.200000 13.200000 }
+		            Amplitudes = {0.0000000000000 0.1800000071526 0.1800000071526 0.0000000000000 0.0000000000000 0.0000000000000 }
+		        }
+		        +KiWaveform = {
+		            Class = Waveform
+			    Rounding = 500
+		            Times = {10.000000 10.001000 10.005000 11.600000 11.670000 12.200000 13.200000 }
+		            Amplitudes = {0.0000000000000 0.0000000000000 1.0000000000000 1.0000000000000 0.0000000000000 0.0000000000000 0.0000000000000 }
+		        }
+		        +KdWaveform = {
+		            Class = Waveform
+			    Rounding = 500
+		            Times = {10.000000 10.001000 10.005000 11.600000 11.670000 12.200000 13.200000 }
+		            Amplitudes = {0.0000000000000 0.0000000000000 0.0024999999441 0.0024999999441 0.0000000000000 0.0000000000000 0.0000000000000 }
+		        }
+		
+	     }
+	        
+   +PIDALT = {
+                Class = FTUPID
+                Tau = 0.000000
+                +KpWaveform = {
+                    Class = Waveform
+	            Rounding = 500
+                    Times = {10.000000 10.075000 10.450000 11.750000 12.001000 12.300000 13.300000 }
+                    Amplitudes = {0.0000000000000 2.0000000000000 2.0000000000000 2.0000000000000 2.0000000000000 0.0000000000000 0.0000000000000 }
+                }
+                +KiWaveform = {
+                    Class = Waveform
+	            Rounding = 500
+                    Times = {10.000000 10.050000 10.300000 11.500000 12.005050 12.500000 13.500000 }
+                    Amplitudes = {0.0000000000000 11.0000000000000 18.0000000000000 18.0000000000000 18.0000000000000 0.0000000000000 0.0000000000000 }
+                }
+                +KdWaveform = {
+                    Class = Waveform
+	            Rounding = 500
+                    Times = {8.800000 11.000000 12.800000 13.800000 }
+                    Amplitudes = {0.0000000000000 0.0000000000000 0.0000000000000 0.0000000000000 }
+                }
+            }
+	   
+           //Double integrator for Ip controls
+           +SwitchedDoubleIntegrator=
+            {
+              Class = SwitchedDoubleIntegrator
+              
+              U1FilterTau = 0.75 //0.75 filter on u1
+              IplaFilterTau = 0.75 //0.75 filter on Ipla
+              Sigma_x1 = 5000.0 //5000.0 amplitude saturation for x1
+              Sigma_x2 = 10000.0 // 1E4 derivative saturation (for x2)
+	      Sigma_x2_discharge = 50000.0 // 5E4 derivative saturation (for x2) when discharge is activated
+              Sigma_de = 1000000.0 //1E6 d_error amplitude threshold
+              Sigma_e  = 160000.0 //150E3 error amplitude threshold
+              K12_bar  = 5.0  //Gain of the first integrator, set to zero for deactivate it
+              K2e_bar  = 1.0  //Gain of the first integrator
+              EpsilonDischarge = 0.01 //1 double poles in -1/epsilonDischarge to discharge the double integrator
+                   
+              StartTimeDoubleSwitchedIntegrator = 10.1  //time when DoubleSwitchedIntegrator is activated
+              EndTimeDoubleSwitchedIntegrator   = 11.4  //time when DoubleSwitchedIntegrator deactivated
+   
+              +U1Derivator =
+              {
+                Class = PseudoDerivator
+	        WindowSize=18
+	        SubWindowsSize=6
+	      }
+
+	      +IplaDerivator =
+              {
+                Class = PseudoDerivator
+	        WindowSize=18
+	        SubWindowsSize=6
+	      }
+
+
+	    }
+
+
+              +PIDALV = {
+                Class = FTUPID
+                Tau = 0.000000
+		+KpWaveform = {
+                    Class = Waveform
+	            Rounding = 500
+                    Times = {10.000000 10.005000 10.200000 10.395512 11.494476 11.600902 12.500000 13.500000 }
+                    Amplitudes = {0.0000000000000 0.0000000000000 0.0000000000000 0.0000000000000 0.0000000000000 0.0000000000000 0.0000000000000 0.0000000000000 }
+                }
+                +KiWaveform = {
+                    Class = Waveform
+	            Rounding = 500
+                    Times = {10.000000 10.170000 11.496790 11.600902 12.000000 12.500000 13.500000 }
+                    Amplitudes = {0.0000000000000 0.0000000000000 0.0000000000000 0.0000000000000 0.0000000000000 0.0000000000000 0.0000000000000 }
+                }
+                +KdWaveform = {
+                    Class = Waveform
+	            Rounding = 500
+                    Times = {10.000000 10.200000 11.497276 11.500000 11.599074 12.800000 13.800000 }
+                    Amplitudes = {0.0000000000000 0.0000000000000 0.0000000000000 0.0000000000000 0.0000000000000 0.0000000000000 0.0000000000000 }
+                }
+            }
+            
+
+         /*   +AWControl = {
+	        Class = AntiWindUpController
+	        AntiWindupGain = 1.0
+	        AntiwindupEnabledHigherCurrentThreshold = 5000.0	
+	        AntiwindupEnabledLowerCurrentThreshold = 4000.0
+
+	        +HCModel = {
+		        Class = HCModel
+		        Alpha = 9.8074e-4
+		        Beta = 53.8761
+	        }
+	        +ALFModel = {
+	              	Class = ALFModel
+		        SampligTime = 0.0005
+		        PHSCKp = 1.5
+		        PHSCKi = 25.0
+		        PHSCKd = 0.5
+	        }
+	        +ALFPlasmaModel = {
+		        Class = LinearPlasmaModel
+		        A = {
+		                0 = {1 0 0 0 0}
+		                1 = {0 1 0 0 0}
+		                2 = {0 0 1 0 0}
+		                3 = {0 0 0 1 0}
+		                4 = {0 0 0 0 1}		
+		        }
+		        B = {
+		                0 = {1 0 0 0 0}
+		                1 = {0 1 0 0 0}
+		                2 = {0 0 1 0 0}
+		                3 = {0 0 0 1 0}
+		                4 = {0 0 0 0 1}		
+		        }
+		        C = {
+		                0 = {1 0 0 0 0}
+		                1 = {0 1 0 0 0}
+		        }
+		        D = {
+		                0 = {0 0 0 0 0}
+		                1 = {0 0 0 0 0}
+		        }
+	        }
+	        +HCPlasmaModel = {
+		        Class = LinearPlasmaModel
+
+		        A = {
+		                0 = {1 0 0 0 0}
+		                1 = {0 1 0 0 0}
+		                2 = {0 0 1 0 0}
+		                3 = {0 0 0 1 0}
+		                4 = {0 0 0 0 1}			
+		        }
+		        B = {
+		                0 = {1 0 0 0 0}
+		                1 = {0 1 0 0 0}
+		                2 = {0 0 1 0 0}
+		                3 = {0 0 0 1 0}
+		                4 = {0 0 0 0 1}	
+		        }
+		        C = {
+		                0 = {1 0 0 0 0}
+		                1 = {0 1 0 0 0}
+		        }
+		        D = {
+		                0 = {0 0 0 0 0}
+		                1 = {0 0 0 0 0}
+		        }
+
+	        }
+	        //	+ALFPlasmaModel = {
+	        //		Class = PlasmaModel1
+	        //		K = -6.8750e-07
+	        //		Tau = 0.008
+	        //		SamplingTime = 0.0020	
+	        //	}
+	        //	+HCPlasmaModel = {
+	        //		Class = PlasmaModel1
+	        //		K = -6.8750e-07
+	        //		Tau = 0.008
+	        //		SamplingTime = 0.0020	
+	        //	}
+
+                
+	     }*/  
+        
+            +VVerticalFieldBalancer ={                           
+                               Class =VerticalFieldBalancer  
+                               Epsilon=500.0        
+                               Alpha=4.317460317    
+                               AlphaOne=-0.0428     
+                               AlphaZero=-2470                                     
+                               MaxSatDerivate = 0.0                                                                                
+                               MinSatDerivate = 0.0                                                   
+                               MaxSat = 15000.0                                              
+                               MinSat = -15000.0                      
+                               Tau=0.96                                                              
+                               +TimeEnable = {                                           
+                                   Class = Waveform                                                                                 
+                                   Rounding = 500                                                      
+                                   Times =     {0.0 10.1995  10.2     11.5995  11.6   20.0}                                          
+                                   Amplitudes = {0.0 0.0      1.0      1.0   1.0       1.0}
+                                }                                                                                                                            
+            }   
+
+
+	    +ElongControl = {
+			Class = ElongationController
+			K = 5.0
+			B1 = 4.317460317 		//B1 272.0/63.0 
+			B2 = -1.0
+		       MaxStateDerivative = 6000.0                        
+                       MinStateDerivative = -6000.0                      
+                       MaxState = 1300.0                          
+                       MinState = -1300.0                       
+                       MinLow = 10.0                          
+                       MaxLow = 19000.0                      
+                       MinUp = 1000.0                       
+                       MaxUp = 19500.0                       
+                       IVSign = -1.000000
+                       SamplingTime = 500E-6                              
+                       Mode = 1              // 0-Elongation  1-IFRif  2-RunawayRefGen                                                             
+                                                                                                                                                             
+                       //if mode == RunawayRefGen                
+                       AlphaOne=0.0428  //DeltaIF/DeltaIP=Alpha            
+                       Sigma=0.7     // Distanza massima percentuale dalla saturazione         
+                                                                                                                                                             
+                       K1 = 0.2169 //(1.0)/(4.61) 1/k1 di articolo                                                     
+                       K2 = 0.2240 //1.0325)/(4.61) k0/k1 articolo                                                   
+                                                                                                                                                             
+                       +TimeEnable = {
+                           Class = Waveform                              
+                           Rounding = 500                                                                      
+                           Times =      {0.0 10.1995  10.12    15.0  15.5   }                                        
+                           Amplitudes = {0.0 0.0      1.0      1.0   0.0  }                                                                        
+                        }                                                                                                                                    
+                                                                                                                                                                                   
+				+Ref ={                                                                                                                             
+                         Class = Waveform                                                                                                                 
+                         Rounding = 500                                                                                                                   
+                        // Times =      {0.0 10.0 10.15 10.2 20.0}                                                                                            
+                        // Amplitudes = {0.0 1.03 1.06  1.075 1.075}                                                                                             
+                           Times = {10.000000 10.200000 11.400000 11.500000 12.500000 }                                                                                                               
+                           Amplitudes = {1.0399999618530 1.0399999618530 1.0399999618530 1.0399999618530 0.0000000000000 }                                                                                                           
+                        }                                                                                                                                    
+                                                                                                                                                             
+                }   
+
+	    +ReRefRunaway = {
+			Class = ReRef
+
+			ActivateTime = 0.1       
+            MinIplActivationValue = 40E3
+
+            T_zero_plasma   = 10.0   // this is the offset
+            T_end           = 2.0
+
+            CQ_dIpl_threshold = -1E7
+            Reverse_vloop_ipl = 1                         //1 if sign ipl is equal to sign (vloop) ; FTU == 1; TCV == -1
+            //new ref for ire current
+            REREF_beta = 0.9                       //  % exponential decay rate
+            REREF_deltaTdes = 0.3                  //  % 300ms
+            REREF_enableMultiplePlateau = 1        //  % enable multiple plateau
+            //shift the straight line of the new ipref
+
+
+            TRIGGER_threshold_ipl_time_fall_apart = 0.1
+            TRIGGER_threshold_ipl_drift_apart     =1e6    //if this has to be really used the threshold_vloop MUST be very large 1e6
+            TRIGGER_gamma_ipl_track               =1
+            TRIGGER_enable_trigger_track_ipl      =1
+            TRIGGER_delay_activate_ipl_track      =0.01
+            TRIGGER_delay_activate_ipl_cq         =0.02
+            TRIGGER_threshold_vloop               =4.5      //E6; //if this has to be really used the threshold_ipl_drift_apart MUST be very large 1e6
+            TRIGGER_dipl_track_threshold          =1E7
+            TRIGGER_gamma_ipl_track_vloop_mhd     =1       // deltaIplDrop = TRIGGER_gamma_ipl_track_vloop_mhd (ipl - ipl_ref_new)
+            TRIGGER_threshold_ipl_vloop_activation=2E4     // if (ipl-ipl_ref) < threshold_ipl_vloop_activation then enable track_vloop_mhd
+    
+
+            
+            PWM_enable_block    = 1                       //always in abs value
+            PWM_amp             = 0.5E4					  //pwm amplitude
+            PWM_period          = 0.01					  //pwm period 10 ms
+            PWM_delay_activate  = 0.005					  //pwm delay of the pwm activation after plateaus detect
+            PWM_duty_cycle      = 0.5					  //50%
+    
+
+
+             //pseudo_derivator
+            +CQ_IplDerivative =
+                {
+                    Class = PseudoDerivator
+                    WindowSize=12
+                    SubWindowsSize=5
+                }
+    
+                                                                                                                                                             
+         }   
+
+
+
+
+	    InputSignals = {
+		input = {
+		    SignalName = ControllerIn
+		    SignalType = ControllerGAMInputStructure
+		    FlatNamed  = True
+		}
+	    }
+	    OutputSignals = {
+		output = {
+		    SignalName = ControllerOut
+		    SignalType = ControllerGAMOutputStructure
+		    FlatNamed  = True
+		}
+	    }
+
+	    Remappings={
+	    	InputInterface={
+			//time = usecTime
+                     //   safetyWord = usecTime 
+			fbcor_ALF_prep = ifPrep
+ 			fbcor_ALT_prep = itPrep
+ 			fbcor_ALV_prep = ivPrep
+ 			fbcor_ALH_prep = ihPrep
+ 			fbTenVpRif = FBTenVp		// rif. tensione resistiva di plasma
+			fbadmBpRif = FBAdmBp   		// rif. beta poloidale	
+			fbindLipRif = ZEROWAVE		// Delta Psi Orizzontale Prep
+			ipl  =  IPL //FBIP_M_I 		// ipl
+			dep = dep
+			dez = dez //dez
+		//	hard_x_ray = FBINA_M_RIS
+			badGasMeas = dcnBadGasMeas	 
+		}
+	    	OutputInterface={
+			
+						
+		}
+
+	   }
+ 
+        }
+/*- 
+
+Il modello linearizzato è nella forma
+
+x'(t) = Ax(t)+Bu(t), x(0) = x0
+y(t) = Cx(t)+Du(t)
+
+
+la matrice A (discretizzata) sarebbe l'entry StateFromState (nomi del 
+cazzo di Zabeo)
+- la matrice B (discretizzata) sarebbe l'entry StateFromInput
+- la matrice C (discretizzata) sarebbe l'entry OutputFromState
+- la matrice D (discretizzata) sarebbe l'entry OutputFromInput
+- lo stato iniziale x0 è l'entry StateInitGuess
+
+StateSpaceModelOriginal
+
+*/
+
+
+        +HCircuitDezModel = {
+            Class = SSM
+	    PatchOutputSignals=False
+            USecTimeSignalName = usecTime
+	    
+             InputMap = {
+		Ih = {
+                    SignalName = IhControl
+                    SignalType = float
+                }
+	     }
+
+             OutputMap = {
+		dezMod = {
+                    SignalName = dezModel//dez
+                    SignalType = float
+                }
+          
+             }
+            
+             Models = {
+                +DEZModel = {
+                    Class = SSMGenericModel
+                    Tstart = 10.2
+                    StateFromState = {
+                        0 = { 9.7014e-001  4.9251e-004  1.2375e-007}
+                        1 = {-4.141e-1     9.999e-001   4.9980e-004}
+                        2 = { -3.8887e-2  -9.7708e-06   1.0000e+00 }
+                    }
+                    StateFromInput = {
+                        0 = {  -2.5218e-05}
+			1 = {-2.0545e-04}
+			2 = {4.2843e-04}
+                      }                   
+                    OutputFromState = {
+                        0 = {1 0 0}
+	               
+                    }
+                    OutputFromInput = {
+                        { 0 }
+			
+                    }
+                }
+                    StateInitGuess ={7.7E-3 0 0}                
+             }
+	}
+
+        +PreFillControl = {
+	  Version = "$Id: MARTe-TestStreaming.cfg,v 1.4 2009/03/20 15:22:55 ppcc_dev Exp $"
+	  Class = GasFluxControlGAM
+	  InputSignals = {
+		input = {
+		    SignalName = GasFluxControlIn
+		    SignalType = GasFluxControlGAMInputStructure
+		    FlatNamed  = True
+		}
+	    }
+	    OutputSignals = {
+		output = {
+		    SignalName = GasFluxControlOut
+		    SignalType = GasFluxControlGAMOutputStructure
+		    FlatNamed  = True
+		}
+	    }
+
+	    Remappings={
+	    	InputInterface={
+			dcnRef = PREFILL_REF
+			dcnFeedback = PKR1
+			FTUTime = usecTime
+		}
+	    	OutputInterface={
+			saturatedRequestedFlow = SAT_FLOW_REQ_MB
+			saturatedRequestedFlow1 = SAT_FLOW_REQ_MB1
+			saturatedRequestedFlow2 = SAT_FLOW_REQ_MB2
+			error = MBAR_ERROR
+                        integralState = PREFILL_INTEGRAL_MB
+		        nonSaturatedRequestedFlow =NONSAT_FLOW_REQ_MB
+			badGasMeas=pkrBadGasMeas
+			gain=prefillkp 
+		}
+
+	    }
+	    	
+	    FilterErrorBound = 0 //1.e+17		//se lerrore è minore metto a 0!!
+	    TStart = 0.0
+	    TStop = 9.99
+	    Kp = 1000000
+	    Alfa =0.4
+	    SaturationLowerBound = 2.0
+            SaturationUpperBound = 1808.6	    	    
+	    NoDCNMeasureMsTimeout=50
+            BadGasSecurityCheckOffsetFromStart=9999
+            BadGasSecurityCheckDuration=5000
+            FeedbackLowerBound=1e-9            
+            FeedbackUpperBound=4e-4
+                  
+	}
+
+
+	+PlasmaDensityControl = {
+	  Version = "$Id: MARTe-TestStreaming.cfg,v 1.4 2009/03/20 15:22:55 ppcc_dev Exp $"
+	  Class = GasFluxControlGAM
+	  InputSignals = {
+		input = {
+		    SignalName = GasFluxControlIn
+		    SignalType = GasFluxControlGAMInputStructure
+		    FlatNamed  = True
+		}
+	    }
+	    OutputSignals = {
+		output = {
+		    SignalName = GasFluxControlOut
+		    SignalType = GasFluxControlGAMOutputStructure
+		    FlatNamed  = True
+		}
+	    }
+
+	    Remappings={
+	    	InputInterface={
+			dcnRef = DENSITY_PLASMA_REF
+			dcnFeedback = DCN
+			FTUTime = usecTime
+		}
+	    	OutputInterface={
+			saturatedRequestedFlow = SAT_FLOW_REQ_P
+			saturatedRequestedFlow1 = SAT_FLOW_REQ_P1
+			saturatedRequestedFlow2 = SAT_FLOW_REQ_P2
+			deErr = DCN_ERROR_P
+            newIntegralState = PREFILL_INTEGRAL_P
+		    nonSaturatedRequestedFlow =NONSAT_FLOW_REQ_P
+			badGasMeas=dcnBadGasMeas    
+			gain=dcnkp                   
+		    }
+
+	    }
+	    
+	    FilterErrorBound = 0 //1.e+17		//se lerrore è minore metto a 0!!
+	    TStart = 10.0
+	    TStop = 12.0
+	    //Kp = 65.0
+	    Alfa =0.5
+	    SaturationLowerBound = 3.0
+            SaturationUpperBound = 1808.6	    	    
+	    NoDCNMeasureMsTimeout=50		    	    
+            BadGasSecurityCheckOffsetFromStart=250
+	    BadGasSecurityCheckDuration=1250
+          
+            FeedbackLowerBound=1            
+            FeedbackUpperBound=500
+	    PreprogrammedReference=False
+	    
+	    +PREPROGRAMMED = {   
+                   Class = WaveformClassPoints
+                   Tstart = 0.0
+                   Tend = 15.0
+                   TimeVector =  {10.001000 10.002000 10.003000 10.004000 10.005000 10.006000 10.007000 10.008000 10.050100 10.050200 10.058052 10.058057 10.068057 10.068062 10.075914 10.083766 10.083771 10.093771 10.093776 10.101629 10.109481 10.109486 10.119486 10.119491 10.127343 10.135195 10.135200 10.145200 10.145205 10.153057 10.160909 10.160914 10.170914 10.170919 10.178771 10.186624 10.186629 10.196629 10.196634 10.204486 10.212338 10.212343 10.222343 10.222348 10.230200 10.230300 10.241962 10.241967 10.251967 10.251972 10.263633 10.275295 10.275300 10.285300 10.285305 10.296967 10.308628 10.308633 10.318633 10.318638 10.330300 10.330400 10.350395 10.350400 10.360400 10.360405 10.380400 10.400395 10.400400 10.410400 10.410405 10.430400 10.450395 10.450400 10.460400 10.460405 10.480400 10.500395 10.500400 10.510400 10.510405 10.530400 10.550395 10.550400 10.560400 10.560405 10.580400 10.600395 10.600400 10.610400 10.610405 10.630400 10.650395 10.650400 10.660400 10.660405 10.680400 10.700395 10.700400 10.710400 10.710405 10.730400 10.750395 10.750400 10.760400 10.760405 10.780400 10.800395 10.800400 10.810400 10.810405 10.830400 10.830500 10.850495 10.850500 10.860500 10.860505 10.880500 10.900495 10.900500 10.910500 10.910505 10.930500 10.950495 10.950500 10.960500 10.960505 10.980500 }
+                   ValueVector = {0.0000000000000 0.0000000000000 0.0000000000000 0.0000000000000 0.0000000000000 0.0000000000000 0.0000000000000 0.0000000000000 0.0000000000000 0.0000000000000 0.0000000000000 200.0000000000000 200.0000000000000 0.0000000000000 0.0000000000000 0.0000000000000 200.0000000000000 200.0000000000000 0.0000000000000 0.0000000000000 0.0000000000000 200.0000000000000 200.0000000000000 0.0000000000000 0.0000000000000 0.0000000000000 200.0000000000000 200.0000000000000 0.0000000000000 0.0000000000000 0.0000000000000 200.0000000000000 200.0000000000000 0.0000000000000 0.0000000000000 0.0000000000000 200.0000000000000 200.0000000000000 0.0000000000000 0.0000000000000 0.0000000000000 200.0000000000000 200.0000000000000 0.0000000000000 0.0000000000000 0.0000000000000 0.0000000000000 200.0000000000000 200.0000000000000 0.0000000000000 0.0000000000000 0.0000000000000 200.0000000000000 200.0000000000000 0.0000000000000 0.0000000000000 0.0000000000000 200.0000000000000 200.0000000000000 0.0000000000000 0.0000000000000 0.0000000000000 0.0000000000000 200.0000000000000 200.0000000000000 0.0000000000000 0.0000000000000 0.0000000000000 200.0000000000000 200.0000000000000 0.0000000000000 0.0000000000000 0.0000000000000 200.0000000000000 200.0000000000000 0.0000000000000 0.0000000000000 0.0000000000000 200.0000000000000 200.0000000000000 0.0000000000000 0.0000000000000 0.0000000000000 200.0000000000000 200.0000000000000 0.0000000000000 0.0000000000000 0.0000000000000 200.0000000000000 200.0000000000000 0.0000000000000 0.0000000000000 0.0000000000000 200.0000000000000 200.0000000000000 0.0000000000000 0.0000000000000 0.0000000000000 200.0000000000000 200.0000000000000 0.0000000000000 0.0000000000000 0.0000000000000 200.0000000000000 200.0000000000000 0.0000000000000 0.0000000000000 0.0000000000000 200.0000000000000 200.0000000000000 0.0000000000000 0.0000000000000 0.0000000000000 0.0000000000000 200.0000000000000 200.0000000000000 0.0000000000000 0.0000000000000 0.0000000000000 200.0000000000000 200.0000000000000 0.0000000000000 0.0000000000000 0.0000000000000 200.0000000000000 200.0000000000000 0.0000000000000 0.0000000000000 }	
+
+                }
+
+	    +GAIN = {   
+                   Class = WaveformClassPoints
+                   Tstart = 0.0
+                   Tend = 15.0
+                   TimeVector =  {10.00  12.5}
+                   ValueVector = {5.0    5}	
+
+                }	
+
+
+	}
+
+	+SwapFlowReq = {
+	  Version = "$Id: MARTe-TestStreaming.cfg,v 1.4 2009/03/20 15:22:55 ppcc_dev Exp $"
+	  Class = SwapSignalsGAM
+	  InputSignals = {
+		input = {
+		    SignalName = SwapSignals
+		    SignalType = SwapSignalsGAMInputStructure
+		    FlatNamed  = True
+		}
+	    }
+	    OutputSignals = {
+		output = {
+		    SignalName = SwapSignals
+		    SignalType = SwapSignalsGAMOutputStructure
+		    FlatNamed  = True
+		}
+	    }
+
+	    Remappings={
+	    	InputInterface={
+                        usecTime=usecTime
+			in1=SAT_FLOW_REQ_MB
+                        in2=SAT_FLOW_REQ_P
+			}
+	    	OutputInterface={
+			out= SAT_FLOW_REQ
+			}
+
+	    	}
+                
+                Time2Swap=10.0
+    
+            }
+	
+	+FluxVoltage = {
+	  Version = "$Id: MARTe-TestStreaming.cfg,v 1.4 2009/03/20 15:22:55 ppcc_dev Exp $"
+	  Class = FluxVoltageGAM
+	  InputSignals = {
+		input = {
+		    SignalName = FluxVoltageIn
+		    SignalType = FluxVoltageGAMInputStructure
+		    FlatNamed  = True
+		}
+	    }
+	    OutputSignals = {
+		output = {
+		    SignalName = FluxVoltageOut
+		    SignalType = FluxVoltageGAMOutputStructure
+		    FlatNamed  = True
+		}
+	    }
+
+	    Remappings={
+	    	InputInterface={
+			polm1 = AVALPOLM1
+			polm2 = AVALPOLM2
+			polm3 = AVALPOLM3
+			polm4 = AVALPOLM4
+			pkr2 =  PKR2
+			pkr1 = PKR1	
+			appliedFlux = SAT_FLOW_REQ 
+			}
+	    	OutputInterface={
+			appliedVoltage = VALVE_CMD 
+			}
+
+	    	}
+
+            Voltage = {0.0 4.0   5.0   6.0     7.0      8.0    9.5} 
+            Scope = {0.0   6.0   47    102.3  657.2    1300   1808.6}
+    	}
+
+	+SwapRef = {
+	  Version = "$Id: MARTe-TestStreaming.cfg,v 1.4 2009/03/20 15:22:55 ppcc_dev Exp $"
+	  Class = SwapSignalsGAM
+	  InputSignals = {
+		input = {
+		    SignalName = SwapSignals
+		    SignalType = SwapSignalsGAMInputStructure
+		    FlatNamed  = True
+		}
+	    }
+	    OutputSignals = {
+		output = {
+		    SignalName = SwapSignals
+		    SignalType = SwapSignalsGAMOutputStructure
+		    FlatNamed  = True
+		}
+	    }
+
+	    Remappings={
+	    	InputInterface={
+                        usecTime=usecTime
+			in1= PREFILL_REF
+                        in2= DENSITY_PLASMA_REF
+			}
+	    	OutputInterface={
+			out= DENSITY_REFERENCE
+			}
+
+	    	}
+                
+                Time2Swap=10.0
+    
+            }
+
+	+SwapDen = {
+	  Version = "$Id: MARTe-TestStreaming.cfg,v 1.4 2009/03/20 15:22:55 ppcc_dev Exp $"
+	  Class = SwapSignalsGAM
+	  InputSignals = {
+		input = {
+		    SignalName = SwapSignals
+		    SignalType = SwapSignalsGAMInputStructure
+		    FlatNamed  = True
+		}
+	    }
+	    OutputSignals = {
+		output = {
+		    SignalName = SwapSignals
+		    SignalType = SwapSignalsGAMOutputStructure
+		    FlatNamed  = True
+		}
+	    }
+
+	    Remappings={
+	    	InputInterface={
+                        usecTime=usecTime
+			in1=PKR1
+                        in2=DCN
+			}
+	    	OutputInterface={
+			out=EFFECTIVE_DENSITY
+			}
+
+	    	}
+                
+                Time2Swap=10.0
+    
+            }
+
+
+ 	+InputGAM = {
+         Class = IOGAMs::InputGAM
+	 UsecTimeSignalName = usecTime           
+	 BoardName = SynchBoard2
+            Signals = {
+		PSI = {
+				SignalName = psi[820]
+				SignalType = float
+			}	
+		
+	       PSIR = {
+				SignalName = maxPsiR
+				SignalType = float
+			}
+	       PSIZ = {
+				SignalName = maxPsiZ
+				SignalType = float
+			}
+	       
+                OdinTime = {
+                    SignalName =  OdinTime
+                    SignalType = int32
+                }	  
+		ODIN_USEC_TIME = {
+                	    SignalName = OdinGAMRelativeUsecTime
+			    SignalType = float
+		}
+		
+   
+         }
+        }
+	+StreamingGAM = {
+		    Class = IOGAMs::OutputGAM
+		    BoardName = StreamingDrv
+		    UsecTimeSignalName = usecTime
+		    Signals = {
+			PCKCNT = {
+				SignalName = packetNumber
+				SignalType = int32
+			}	    	    
+	    		SW_CLOCK = {
+				SignalName = usecTime
+			    	SignalType = int32
+			}
+
+			LOCAL_EXTERNAL_CLOCK_TIME= {
+			    SignalName = ZEROWAVE
+			    SignalType = float
+			}
+
+			LOCAL_ABSOLUTE_CLOCK_TIME= {
+			    SignalName = ZEROWAVE
+			    SignalType = float
+			}
+			
+			CycleTime = {
+				SignalName = CycleUsecTime
+				SignalType = float
+			}
+
+			Signal0 = {
+		            SignalName = VL  
+		            SignalType = float
+		        }
+			Signal1 = {
+		            SignalName = VM //RPbtor
+		            SignalType = float 
+
+		        }
+			Signal2 = {
+		            SignalName =  FBINA_M_RIS //ecrhalphareflo
+		            SignalType = float
+
+		        }
+			Signal3 = {
+		            SignalName = ZEROWAVE
+		            SignalType = float 
+
+		        }
+			Signal4 = {
+		            SignalName = ZEROWAVE
+		            SignalType = float
+
+		        }
+			Signal5 = {
+		            SignalName = ipRif1
+		            SignalType = float
+		       
+			 }
+			Signal6 = {
+		            SignalName = IPL
+		            SignalType = float
+
+		        }
+			Signal7 = {
+		            SignalName = ZEROWAVE
+		            SignalType = float 
+
+		        }
+			Signal8 = {
+		            SignalName = VS01
+		            SignalType = float
+
+		        }
+			Signal9 = {
+		            SignalName = VS02
+		            SignalType = float
+
+		        }
+			Signal10 = {
+		            SignalName = VS03
+		            SignalType = float
+
+		        }
+			Signal11 = {
+		            SignalName = VS04
+		            SignalType = float
+
+		        }
+			Signal12 = {
+		            SignalName = VS05
+		            SignalType = float
+
+		        }
+			Signal13 = {
+		            SignalName = VS06
+		            SignalType = float
+
+		        }
+			Signal14 = {
+		            SignalName = VS07
+		            SignalType = float
+
+		        }
+			Signal15 = {
+		            SignalName = VS08
+		            SignalType = float
+
+		        }
+			Signal16 = {
+		            SignalName = VS09
+		            SignalType = float
+		        }
+			Signal17 = {
+		            SignalName = VS10
+		            SignalType = float 
+
+		        }
+			Signal18 = {
+		            SignalName = VS11
+		            SignalType = float
+
+		        }
+			Signal19 = {
+		            SignalName = VS12
+		            SignalType = float
+
+		        }
+			Signal20 = {
+		            SignalName = VS13
+		            SignalType = float 
+
+		        }
+			Signal21 = {
+		            SignalName = VS14
+		            SignalType = float
+
+		        }
+			Signal22 = {
+		            SignalName = VS15
+		            SignalType = float
+		        
+			}
+			Signal23 = {
+		            SignalName = VS16
+		            SignalType = float
+		        }
+			Signal24 = {
+		            SignalName = VB01
+		            SignalType = float
+		        }
+			Signal25 = {
+		            SignalName = VB02
+		            SignalType = float
+		        }
+			Signal26 = {
+		            SignalName = VB03
+		            SignalType = float
+		        }
+			Signal27 = {
+		            SignalName = VB04
+		            SignalType = float
+		        }
+			Signal28 = {
+		            SignalName = VB05
+		            SignalType = float
+		        }
+			Signal29 = {
+		            SignalName = VB06
+		            SignalType = float
+		        }
+			Signal30 = {
+		            SignalName = VB07
+		            SignalType = float
+		        }
+			Signal31 = {
+		            SignalName = VB08
+		            SignalType = float
+		        }
+			Signal32 = {
+		            SignalName = VB09
+		            SignalType = float
+		        }
+			Signal33 = {
+		            SignalName = VB10
+		            SignalType = float
+		        }
+			Signal34 = {
+		            SignalName = VB11
+		            SignalType = float
+		        }
+			Signal35 = {
+		            SignalName = VB12
+		            SignalType = float
+		        }
+			Signal36 = {
+		            SignalName = VB13
+		            SignalType = float
+		        }
+			Signal37 = {
+		            SignalName = VB14
+		            SignalType = float
+		        }
+			Signal38 = {
+		            SignalName = VB15
+		            SignalType = float
+		        }
+			Signal39 = {
+		            SignalName = VB16
+		            SignalType = float
+		        }
+			Signal40 = {
+		            SignalName = DENSITY_REFERENCE 
+		            SignalType = float
+		        }
+			Signal41 = {
+		            SignalName = POTPER
+		            SignalType = float
+		        }
+			Signal42 = {
+		            SignalName = PKR1
+		            SignalType = float
+		        }
+			Signal43 = {
+		            SignalName = PKR2
+		            SignalType = float
+
+		        }
+			Signal44 = {
+		            SignalName = AVALPOLM1 // LMTR1T
+		            SignalType = float
+
+		        }
+			Signal45 = {
+		            SignalName = AVALPOLM2 //DMYI3
+		            SignalType = float
+
+		        }
+			Signal46 = {
+		            SignalName = AVALPOLM3 //LMTR2T
+		            SignalType = float
+
+		        }
+			Signal47 = {
+		            SignalName = AVALPOLM4 //LMTR3T
+		            SignalType = float
+
+		        }
+			mec0 = {
+		            SignalName = MEC0
+		            SignalType = float
+		        }
+			mec1 = {
+		            SignalName = MEC1
+		            SignalType = float
+		        }
+			mec2 = {
+		            SignalName = MEC2
+		            SignalType = float
+		        }
+			mec3 = {
+		            SignalName = MEC3
+		            SignalType = float
+		        }
+			mic0 = {
+		            SignalName = MIC0
+		            SignalType = float
+		        }
+			mic1 = {
+		            SignalName = MIC1
+		            SignalType = float
+		        }
+			mic2 = {
+		            SignalName = MIC2
+		            SignalType = float
+		        }
+			mic3 = {
+		            SignalName = MIC3
+		            SignalType = float
+		        }
+			mes0 = {
+		            SignalName = MES0
+		            SignalType = float
+		        }
+			mes1 = {
+		            SignalName = MES1
+		            SignalType = float
+		        }
+			mes2 = {
+		            SignalName = MES2
+		            SignalType = float
+		        }
+			mes3 = {
+		            SignalName = MES3
+		            SignalType = float
+		        }
+			mis0 = {
+		            SignalName = MIS0
+		            SignalType = float
+		        }
+			mis1 = {
+		            SignalName = MIS1
+		            SignalType = float
+		        }
+			mis2 = {
+		            SignalName = MIS2
+		            SignalType = float
+		        }
+			mis3 = {
+		            SignalName = MIS3
+		            SignalType = float
+		        }
+	                SignalThetas = {
+		                SignalName = theta[64]
+		                SignalType = float
+	                }
+                 
+                 	Signalcpt = {
+		                SignalName = cpt
+		                SignalType = int
+	                }
+                        SignalCalc19 = {
+                    	    SignalName = VALVE_CMD
+		            SignalType = float
+                        }
+		        SignalCalc20 = {
+                    	    SignalName = SAT_FLOW_REQ
+		            SignalType = float
+                        }
+                        
+		        SignalCalc21 = {
+                    	    SignalName = NONSAT_FLOW_REQ_P
+		            SignalType = float
+                        }
+
+                        SignalCalc30 = {
+                    	    SignalName = PREFILL_INTEGRAL_MB
+		            SignalType = float
+                        }
+                         SignalCalc31 = {
+                    	    SignalName = EFFECTIVE_DENSITY //PREFILL_REF
+		            SignalType = float
+                        }
+		 	SignalALT = {
+				SignalName = ItControl
+				SignalType = float
+			}
+		 	SignalALH = {
+				SignalName = IhControl
+				SignalType = float
+			}
+		 	SignalALV = {
+				SignalName = IvControl
+				SignalType = float
+			}
+		 	SignalALF = {
+				SignalName = IfControl
+				SignalType = float
+			}
+ 			
+           		PSI = {
+				SignalName = psi[820]
+				SignalType = float
+			}
+			Disruption = {
+	                    SignalName = disruption
+                    	    SignalType = int32
+		        }              
+		        Runaway = {
+		            SignalName = runaway
+		            SignalType = int32
+		        } 
+			SignalCalRunPlateau = {
+		            SignalName = runawayPlateau
+		            SignalType = int32
+		        }
+		        dcnbadMeas = {
+		            SignalName = dcnBadGasMeas
+		            SignalType = int32
+		        }
+		  }
+  	    }
+
+          +Statistic = {
+            Class = WebStatisticGAM
+            Verbose = True
+            FrequencyOfVerbose = 2000000
+            Signals = {
+                SignalU = {
+                    SignalName = usecTime
+                    SignalType = int32
+                }
+        	Signal0 = {
+                    SignalName = CycleUsecTime
+                    SignalType = float
+                }
+		
+ 		WavesCycleTime = {
+                    SignalName = WavesRelativeUsecTime
+                    SignalType = float
+                }
+
+                
+		PKREngGam1CycleTime = {
+                    SignalName =PKREngGam1RelativeUsecTime
+                    SignalType = float
+                }
+		PKREngGam2CycleTime = {
+                    SignalName =PKREngGam2RelativeUsecTime
+                    SignalType = float
+                }
+                MomentsGAMCycleTime = {
+                    SignalName = MomentsGAMRelativeUsecTime
+                    SignalType = float
+                }
+                
+		LcsmGAMCycleTime = {
+                    SignalName = LcsmGAMRelativeUsecTime
+                    SignalType = float
+                }
+                ControllerCycleTime = {
+                    SignalName = ControllerRelativeUsecTime
+                    SignalType = float
+                }
+		PlasmaDensityControlCycleTime = {
+                    SignalName =PlasmaDensityControlRelativeUsecTime
+                    SignalType = float
+                }
+		FluxVoltageCycleTime = {
+                    SignalName =FluxVoltageRelativeUsecTime
+                    SignalType = float
+                }
+		
+		 StatisticCycleTime = {
+                    SignalName = StatisticRelativeUsecTime
+                    SignalType = float
+                }
+		StreamingGAMCycleTime = {
+                    SignalName =StreamingGAMRelativeUsecTime
+                    SignalType = float
+                }
+		CollectionCycleTime = {
+                    SignalName =CollectionRelativeUsecTime
+                    SignalType = float
+                }
+
+     
+          }
+        }
+        +Collection = {
+            Class = CollectionGAMs::DataCollectionGAM
+            UsecTimeSignalName = usecTime
+            PreTrigger = 500
+            EventTrigger = {
+                //MaxFastAcquisitionPoints = 800
+                //PointsForSingleFastAcquisition = 400
+             /*   TimeWindow0 = {
+                    NOfSamples = 1
+                    UsecPeriod = -8000000
+                }*/                
+                TimeWindow0 = {
+                    NOfSamples = 30000
+                    UsecPeriod = 500
+                }
+            }
+            NOfAcquisitionSamples = 30000
+            Signals = {
+                CLOCK = {
+                    SignalName = usecTime
+                    JPFName = "CLK"
+                    SignalType = int32
+                }
+                CycleTime = {
+                    SignalName = CycleUsecTime
+                    JPFName = "CycleTime"
+                    SignalType = float
+                } 
+	       
+		LostCycles= {
+	            SignalName = mylostCycles
+                    JPFName = "LOSTCYCLES"
+		    SignalType = int32
+		}
+		/*Signal48 = {
+                    SignalName = FBINA_M_RIS
+                    JPFName = "FBINA_M_RIS"
+                    SignalType = float
+
+                }
+                DCN = {
+                            SignalName = DCN
+                            JPFName = "DCN"
+                            SignalType = float
+                        }
+		Signal40 = {
+                    SignalName = FBMCIAC_M_I
+                    JPFName = "FBMCIAC_M_I"
+                    SignalType = float 
+
+                }
+		Signal41 = {
+                    SignalName = FBRPI_M_LUN
+                    JPFName = "FBRPI_M_LUN"
+                    SignalType = float
+
+                }
+		Signal42 = {
+                    SignalName = FBRPE_M_LUN
+                    JPFName = "FBRPE_M_LUN"
+                    SignalType = float
+               
+		 }
+		Signal43 = {
+                    SignalName = FBIP_M_I
+                    JPFName = "FBIP_M_I"
+                    SignalType = float
+
+                }
+		Signal44 = {
+                    SignalName = FBMCIBC_M_I
+                    JPFName = "FBMCIBC_M_I"
+                    SignalType = float 
+
+                }
+		PSIR = {
+			SignalName = maxPsiR
+			JPFName = "maxPsiR"
+			SignalType = float
+		}
+	        PSIZ = {
+			SignalName = maxPsiZ
+ 			JPFName = "maxPsiZ"
+			SignalType = float
+		}
+	        OdinTime = {
+                    SignalName = OdinTime
+		    JPFName = "OdinTime"
+                    SignalType = int32
+                }
+		ODIN_USEC_TIME = {
+                	    SignalName = OdinGAMRelativeUsecTime
+			    JPFName = "ODINCYCLETIME"
+                	    SignalType = float
+		}
+		Signal8F1 = {
+                    SignalName = "VSF1(0)"
+		    JPFName = "VS01F1"
+                    SignalType = float 
+                }
+		Signal9F1 = {
+                    SignalName = "VSF1(1)"
+		    JPFName = "VS02F1"
+                    SignalType = float 
+                }
+		Signal10F1 = {
+                    SignalName = "VSF1(2)"
+		    JPFName = "VS03F1"
+                    SignalType = float 
+                }
+		Signal11F1 = {
+                    SignalName = "VSF1(3)"
+		    JPFName = "VS04F1"
+                    SignalType = float 
+                }
+		Signal12F1 = {
+                    SignalName = "VSF1(4)"
+                    JPFName = "VS05F1"
+                    SignalType = float 
+		  }
+		Signal13F1 = {
+                    SignalName = "VSF1(5)"
+		    JPFName = "VS06F1"
+                    SignalType = float 
+		  }
+		Signal14F1 = {
+                    SignalName = "VSF1(6)"
+		    JPFName = "VS07F1"
+                    SignalType = float 
+		  }
+		Signal15F1 = {
+                    SignalName = "VSF1(7)"
+		    JPFName = "VS08F1"
+                    SignalType = float 
+		  }
+		Signal16F1 = {
+                    SignalName = "VSF1(8)"
+		    JPFName = "VS09F1"
+                    SignalType = float 
+		  }
+		Signal17F1 = {
+                    SignalName = "VSF1(9)"
+		    JPFName = "VS10F1"
+                    SignalType = float 
+		  }
+		Signal18F1 = {
+                    SignalName = "VSF1(10)"
+		    JPFName = "VS11F1"
+                    SignalType = float 
+		  }
+		Signal19F1 = {
+                    SignalName = "VSF1(11)"
+		    JPFName = "VS12F1"
+                    SignalType = float 
+		  }
+		Signal20F1 = {
+                    SignalName = "VSF1(12)"
+		    JPFName = "VS13F1"
+                    SignalType = float 
+		}
+		Signal21F1 = {
+                    SignalName = "VSF1(13)"
+		    JPFName = "VS14F1"
+                    SignalType = float 
+		}
+		Signal22F1 = {
+                    SignalName = "VSF1(14)"
+		    JPFName = "VS15F1"
+                    SignalType = float 
+		}
+		Signal23F1 = {
+                    SignalName = "VSF1(15)"
+		    JPFName = "VS16F1"
+                    SignalType = float 
+		}
+		Signal24F1 = {
+                    SignalName = "VBF1(0)"
+		    JPFName = "VB01F1"
+                    SignalType = float 
+		}
+		Signal25F1 = {
+                    SignalName = "VBF1(1)"
+		    JPFName = "VB02F1"
+                    SignalType = float 
+		}
+		Signal26F1 = {
+                    SignalName = "VBF1(2)"
+		    JPFName = "VB03F1"
+                    SignalType = float 
+		}
+		Signal27F1 = {
+                    SignalName = "VBF1(3)"
+		    JPFName = "VB04F1"
+                    SignalType = float 
+		}
+		Signal28F1 = {
+                    SignalName = "VBF1(4)"
+		    JPFName = "VB05F1"
+                    SignalType = float 
+		}
+		Signal29F1 = {
+                    SignalName = "VBF1(5)"
+		    JPFName = "VB06F1"
+                    SignalType = float 
+		}
+		Signal30F1 = {
+                    SignalName = "VBF1(6)"
+		    JPFName = "VB07F1"
+                    SignalType = float 
+		}
+		Signal31F1 = {
+                    SignalName = "VBF1(7)"
+		    JPFName = "VB08F1"
+                    SignalType = float 
+		}
+		Signal32F1 = {
+                    SignalName = "VBF1(8)"
+		    JPFName = "VB09F1"
+                    SignalType = float 
+		}
+		Signal33F1 = {
+                    SignalName = "VBF1(9)"
+		    JPFName = "VB10F1"
+                    SignalType = float 
+		}
+		Signal34F1 = {
+                    SignalName = "VBF1(10)"
+		    JPFName = "VB11F1"
+                    SignalType = float 
+		}
+		Signal35F1 = {
+                    SignalName = "VBF1(11)"
+		    JPFName = "VB12F1"
+                    SignalType = float 
+		}
+		Signal36F1 = {
+                    SignalName = "VBF1(12)"
+		    JPFName = "VB13F1"
+                    SignalType = float 
+		}
+		Signal37F1 = {
+                    SignalName = "VBF1(13)"
+		    JPFName = "VB14F1"
+                    SignalType = float 
+		}
+		Signal38F1 = {
+                    SignalName = "VBF1(14)"
+		    JPFName = "VB15F1"
+                    SignalType = float 
+		}
+		Signal39F1 = {
+                    SignalName = "VBF1(15)"
+		    JPFName = "VB16F1"
+                    SignalType = float 
+		}
+
+
+
+		Signal8F2 = {
+                    SignalName = "VSF2(0)"
+		    JPFName = "VS01F2"
+                    SignalType = float 
+                }
+		Signal9F2 = {
+                    SignalName = "VSF2(1)"
+		    JPFName = "VS02F2"
+                    SignalType = float 
+                }
+		Signal10F2 = {
+                    SignalName = "VSF2(2)"
+		    JPFName = "VS03F2"
+                    SignalType = float 
+                }
+		Signal11F2 = {
+                    SignalName = "VSF2(3)"
+		    JPFName = "VS04F2"
+                    SignalType = float 
+                }
+		Signal12F2 = {
+                    SignalName = "VSF2(4)"
+                    JPFName = "VS05F2"
+                    SignalType = float 
+		  }
+		Signal13F2 = {
+                    SignalName = "VSF2(5)"
+		    JPFName = "VS06F2"
+                    SignalType = float 
+		  }
+		Signal14F2 = {
+                    SignalName = "VSF2(6)"
+		    JPFName = "VS07F2"
+                    SignalType = float 
+		  }
+		Signal15F2 = {
+                    SignalName = "VSF2(7)"
+		    JPFName = "VS08F2"
+                    SignalType = float 
+		  }
+		Signal16F2 = {
+                    SignalName = "VSF2(8)"
+		    JPFName = "VS09F2"
+                    SignalType = float 
+		  }
+		Signal17F2 = {
+                    SignalName = "VSF2(9)"
+		    JPFName = "VS10F2"
+                    SignalType = float 
+		  }
+		Signal18F2 = {
+                    SignalName = "VSF2(10)"
+		    JPFName = "VS11F2"
+                    SignalType = float 
+		  }
+		Signal19F2 = {
+                    SignalName = "VSF2(11)"
+		    JPFName = "VS12F2"
+                    SignalType = float 
+		  }
+		Signal20F2 = {
+                    SignalName = "VSF2(12)"
+		    JPFName = "VS13F2"
+                    SignalType = float 
+		}
+		Signal21F2 = {
+                    SignalName = "VSF2(13)"
+		    JPFName = "VS14F2"
+                    SignalType = float 
+		}
+		Signal22F2 = {
+                    SignalName = "VSF2(14)"
+		    JPFName = "VS15F2"
+                    SignalType = float 
+		}
+		Signal23F2 = {
+                    SignalName = "VSF2(15)"
+		    JPFName = "VS16F2"
+                    SignalType = float 
+		}
+		Signal24F2 = {
+                    SignalName = "VBF2(0)"
+		    JPFName = "VB01F2"
+                    SignalType = float 
+		}
+		Signal25F2 = {
+                    SignalName = "VBF2(1)"
+		    JPFName = "VB02F2"
+                    SignalType = float 
+		}
+		Signal26F2 = {
+                    SignalName = "VBF2(2)"
+		    JPFName = "VB03F2"
+                    SignalType = float 
+		}
+		Signal27F2 = {
+                    SignalName = "VBF2(3)"
+		    JPFName = "VB04F2"
+                    SignalType = float 
+		}
+		Signal28F2 = {
+                    SignalName = "VBF2(4)"
+		    JPFName = "VB05F2"
+                    SignalType = float 
+		}
+		Signal29F2 = {
+                    SignalName = "VBF2(5)"
+		    JPFName = "VB06F2"
+                    SignalType = float 
+		}
+		Signal30F2 = {
+                    SignalName = "VBF2(6)"
+		    JPFName = "VB07F2"
+                    SignalType = float 
+		}
+		Signal31F2 = {
+                    SignalName = "VBF2(7)"
+		    JPFName = "VB08F2"
+                    SignalType = float 
+		}
+		Signal32F2 = {
+                    SignalName = "VBF2(8)"
+		    JPFName = "VB09F2"
+                    SignalType = float 
+		}
+		Signal33F2 = {
+                    SignalName = "VBF2(9)"
+		    JPFName = "VB10F2"
+                    SignalType = float 
+		}
+		Signal34F2 = {
+                    SignalName = "VBF2(10)"
+		    JPFName = "VB11F2"
+                    SignalType = float 
+		}
+		Signal35F2 = {
+                    SignalName = "VBF2(11)"
+		    JPFName = "VB12F2"
+                    SignalType = float 
+		}
+		Signal36F2 = {
+                    SignalName = "VBF2(12)"
+		    JPFName = "VB13F2"
+                    SignalType = float 
+		}
+		Signal37F2 = {
+                    SignalName = "VBF2(13)"
+		    JPFName = "VB14F2"
+                    SignalType = float 
+		}
+		Signal38F2 = {
+                    SignalName = "VBF2(14)"
+		    JPFName = "VB15F2"
+                    SignalType = float 
+		}
+		Signal39F2 = {
+                    SignalName = "VBF2(15)"
+		    JPFName = "VB16F2"
+                    SignalType = float 
+		}*/
+		dcnkp = {
+                    SignalName = dcnkp
+                    JPFName = "dcnkp"
+                    SignalType = float
+                }
+	      Signal48 = {
+                    SignalName = FBINA_M_RIS
+                    JPFName = "FBINA_M_RIS"
+                    SignalType = float
+                }
+                DCN = {
+                    SignalName = DCN
+                    JPFName = "DCN"
+                    SignalType = float
+                }
+		/*mec0 = {
+                    SignalName = MEC0
+                    JPFName = "MEC0"
+                    SignalType = float
+                }
+		mec1 = {
+                    SignalName = MEC1
+                    JPFName = "MEC1"
+                    SignalType = float
+                }
+		mec2 = {
+                    SignalName = MEC2
+                    JPFName = "MEC2"
+                    SignalType = float
+                }
+		mec3 = {
+                    SignalName = MEC3
+                    JPFName = "MEC3"
+                    SignalType = float
+                }
+		mic0 = {
+                    SignalName = MIC0
+                    JPFName = "MIC0"
+                    SignalType = float
+                }
+		mic1 = {
+                    SignalName = MIC1
+                    JPFName = "MIC1"
+                    SignalType = float
+                }
+		mic2 = {
+                    SignalName = MIC2
+                    JPFName = "MIC2"
+                    SignalType = float
+                }
+		mic3 = {
+                    SignalName = MIC3
+                    JPFName = "MIC3"
+                    SignalType = float
+                }
+		mes0 = {
+                    SignalName = MES0
+                    JPFName = "MES0"
+                    SignalType = float
+                }
+		mes1 = {
+                    SignalName = MES1
+                    JPFName = "MES1"
+                    SignalType = float
+                }
+		mes2 = {
+                    SignalName = MES2
+                    JPFName = "MES2"
+                    SignalType = float
+                }
+		mes3 = {
+                    SignalName = MES3
+                    JPFName = "MES3"
+                    SignalType = float
+                }
+		mis0 = {
+                    SignalName = MIS0
+                    JPFName = "MIS0"
+                    SignalType = float
+                }
+		mis1 = {
+                    SignalName = MIS1
+                    JPFName = "MIS1"
+                    SignalType = float
+                }
+		mis2 = {
+                    SignalName = MIS2
+                    JPFName = "MIS2"
+                    SignalType = float
+                }
+		mis3 = {
+                    SignalName = MIS3
+                    JPFName = "MIS3"
+                    SignalType = float
+                }*/
+		Signal0 = {
+                    SignalName = VL  
+                    JPFName = "VL"
+                    SignalType = float		  
+                }
+		
+		Signal1f = {
+                    SignalName = VM_F
+		    JPFName = "VM_F"
+                    SignalType = float
+                }
+		Signal2f = {
+                    SignalName = VM_LP
+		    JPFName = "VM_LP"
+                    SignalType = float
+                }
+		Signal1 = {
+                    SignalName = VM
+		    JPFName = "VM"
+                    SignalType = float
+                }
+		SignalRamp8 = {
+                    SignalName = sa05IntegrationRamp
+		    JPFName = "VS05IR"
+                    SignalType = float 
+                }
+		Signal8 = {
+                    SignalName = VS05
+		    JPFName = "VS05"
+                    SignalType = float 
+                }
+		Signaloff8 = {
+                    SignalName = sa05ToroidalOff
+		    JPFName = "VS05TPOFF"
+                    SignalType = float 
+                }
+
+		SignalRampx = {
+                    SignalName = bp12IntegrationRamp
+		    JPFName = "VB12IR"
+                    SignalType = float 
+                }
+		Signalxx = {
+                    SignalName = VB12
+		    JPFName = "VB12"
+                    SignalType = float 
+                }
+		Signaloffxx = {
+                    SignalName = bp12ToroidalOff
+		    JPFName = "VB12TPOFF"
+                    SignalType = float 
+                }
+	/*	 SignalThetas = {
+		                SignalName = theta[64]
+				JPFName = "THETA"
+		                SignalType = float
+		
+	                }*/
+		/*Signal8 = {
+                    SignalName = VS01
+		    JPFName = "VS01"
+                    SignalType = float 
+                }
+		Signal9 = {
+                    SignalName = VS02
+		    JPFName = "VS02"
+                    SignalType = float 
+                }
+		Signal10 = {
+                    SignalName = VS03
+		    JPFName = "VS03"
+                    SignalType = float 
+                }
+		Signal11 = {
+                    SignalName = VS04
+		    JPFName = "VS04"
+                    SignalType = float 
+                }
+		Signal12 = {
+                    SignalName = VS05
+                    JPFName = "VS05"
+                    SignalType = float 
+		  }
+		Signal13 = {
+                    SignalName = VS06
+		    JPFName = "VS06"
+                    SignalType = float 
+		  }
+		Signal14 = {
+                    SignalName = VS07
+		    JPFName = "VS07"
+                    SignalType = float 
+		  }
+		Signal15 = {
+                    SignalName = VS08
+		    JPFName = "VS08"
+                    SignalType = float 
+		  }
+		Signal16 = {
+                    SignalName = VS09
+		    JPFName = "VS09"
+                    SignalType = float 
+		  }
+		Signal17 = {
+                    SignalName = VS10
+		    JPFName = "VS10"
+                    SignalType = float 
+		  }
+		Signal18 = {
+                    SignalName = VS11
+		    JPFName = "VS11"
+                    SignalType = float 
+		  }
+		Signal19 = {
+                    SignalName = VS12
+		    JPFName = "VS12"
+                    SignalType = float 
+		  }
+		Signal20 = {
+                    SignalName = VS13
+		    JPFName = "VS13"
+                    SignalType = float 
+		}
+		Signal21 = {
+                    SignalName = VS14
+		    JPFName = "VS14"
+                    SignalType = float 
+		}
+		Signal22 = {
+                    SignalName = VS15
+		    JPFName = "VS15"
+                    SignalType = float 
+		}
+		Signal23 = {
+                    SignalName = VS16
+		    JPFName = "VS16"
+                    SignalType = float 
+		}
+		Signal24 = {
+                    SignalName = VB01
+		    JPFName = "VB01"
+                    SignalType = float 
+		}
+		Signal25 = {
+                    SignalName = VB02
+		    JPFName = "VB02"
+                    SignalType = float 
+		}
+		Signal26 = {
+                    SignalName = VB03
+		    JPFName = "VB03"
+                    SignalType = float 
+		}
+		Signal27 = {
+                    SignalName = VB04
+		    JPFName = "VB04"
+                    SignalType = float 
+		}
+		Signal28 = {
+                    SignalName = VB05
+		    JPFName = "VB05"
+                    SignalType = float 
+		}
+		Signal29 = {
+                    SignalName = VB06
+		    JPFName = "VB06"
+                    SignalType = float 
+		}
+		Signal30 = {
+                    SignalName = VB07
+		    JPFName = "VB07"
+                    SignalType = float 
+		}
+		Signal31 = {
+                    SignalName = VB08
+		    JPFName = "VB08"
+                    SignalType = float 
+		}
+		Signal32 = {
+                    SignalName = VB09
+		    JPFName = "VB09"
+                    SignalType = float 
+		}
+		Signal33 = {
+                    SignalName = VB10
+		    JPFName = "VB10"
+                    SignalType = float 
+		}
+		Signal34 = {
+                    SignalName = VB11
+		    JPFName = "VB11"
+                    SignalType = float 
+		}
+		Signal35 = {
+                    SignalName = VB12
+		    JPFName = "VB12"
+                    SignalType = float 
+		}
+		Signal36 = {
+                    SignalName = VB13
+		    JPFName = "VB13"
+                    SignalType = float 
+		}
+		Signal37 = {
+                    SignalName = VB14
+		    JPFName = "VB14"
+                    SignalType = float 
+		}
+		Signal38 = {
+                    SignalName = VB15
+		    JPFName = "VB15"
+                    SignalType = float 
+		}
+		Signal39 = {
+                    SignalName = VB16
+		    JPFName = "VB16"
+                    SignalType = float 
+		}*/
+	        /*Signaloff8 = {
+                    SignalName = sa01ToroidalOff
+		    JPFName = "VS01TPOFF"
+                    SignalType = float 
+                }
+		Signaloff9 = {
+                    SignalName = sa02ToroidalOff
+		    JPFName = "VS02TPOFF"
+                    SignalType = float 
+                }
+		Signaloff10 = {
+                    SignalName = sa03ToroidalOff
+		    JPFName = "VS03TPOFF"
+                    SignalType = float 
+                }
+		Signaloff11 = {
+                 	SignalName = sa04ToroidalOff
+		 	JPFName = "VS04TPOFF"
+                        SignalType = float 
+	        }
+		Signaloff12 = {
+                    SignalName = sa05ToroidalOff
+                    JPFName = "VS05TPOFF"
+                    SignalType = float 
+		  }
+		Signaloff13 = {
+                    SignalName = sa06ToroidalOff
+		    JPFName = "VS06TPOFF"
+                    SignalType = float 
+		  }
+		Signaloff14 = {
+                    SignalName = sa07ToroidalOff
+		    JPFName = "VS07TPOFF"
+                    SignalType = float 
+		  }
+		Signaloff15 = {
+                    SignalName = sa08ToroidalOff
+		    JPFName = "VS08TPOFF"
+                    SignalType = float 
+		  }
+		Signaloff16 = {
+                    SignalName = sa09ToroidalOff
+		    JPFName = "VS09TPOFF"
+                    SignalType = float 
+		  }
+		Signaloff17 = {
+                    SignalName = sa10ToroidalOff
+		    JPFName = "VS10TPOFF"
+                    SignalType = float 
+		  }
+		Signaloff18 = {
+                    SignalName = sa11ToroidalOff
+		    JPFName = "VS11TPOFF"
+                    SignalType = float 
+		  }
+		Signaloff19 = {
+                    SignalName =sa12ToroidalOff
+		    JPFName = "VS12TPOFF"
+                    SignalType = float 
+		  }
+		Signaloff20 = {
+                    SignalName = sa13ToroidalOff
+		    JPFName = "VS13TPOFF"
+                    SignalType = float 
+		}
+		Signaloff21 = {
+                    SignalName = sa14ToroidalOff
+		    JPFName = "VS14TPOFF"
+                    SignalType = float 
+		}
+		Signaloff22 = {
+                    SignalName = sa15ToroidalOff
+		    JPFName = "VS15TPOFF"
+                    SignalType = float 
+		}
+		Signaloff23 = {
+                    SignalName = sa16ToroidalOff
+		    JPFName = "VS16TPOFF"
+                    SignalType = float 
+		}
+		Signaloff24 = {
+                    SignalName = bp01ToroidalOff
+		    JPFName = "VB01TPOFF"
+                    SignalType = float 
+		}
+		Signaloff25 = {
+                    SignalName = bp02ToroidalOff
+		    JPFName = "VB02TPOFF"
+                    SignalType = float 
+		}
+		Signaloff26 = {
+                    SignalName = bp03ToroidalOff
+		    JPFName = "VB03TPOFF"
+                    SignalType = float 
+		}
+		Signaloff27 = {
+                    SignalName = bp04ToroidalOff
+		    JPFName = "VB04TPOFF"
+                    SignalType = float 
+		}
+		Signaloff28 = {
+                    SignalName = bp05ToroidalOff
+		    JPFName = "VB05TPOFF"
+                    SignalType = float 
+		}
+		Signaloff29 = {
+                    SignalName = bp06ToroidalOff
+		    JPFName = "VB06TPOFF"
+                    SignalType = float 
+		}
+		Signaloff30 = {
+                    SignalName = bp07ToroidalOff
+		    JPFName = "VB07TPOFF"
+                    SignalType = float 
+		}
+		Signaloff31 = {
+                    SignalName = bp08ToroidalOff
+		    JPFName = "VB08TPOFF"
+                    SignalType = float 
+		}
+		Signaloff32 = {
+                    SignalName = bp09ToroidalOff
+		    JPFName = "VB09TPOFF"
+                    SignalType = float 
+		}
+		Signaloff33 = {
+                    SignalName = bp10ToroidalOff
+		    JPFName = "VB10TPOFF"
+                    SignalType = float 
+		}
+		Signaloff34 = {
+                    SignalName = bp11ToroidalOff
+		    JPFName = "VB11TPOFF"
+                    SignalType = float 
+		}
+		Signaloff35 = {
+                    SignalName = bp12ToroidalOff
+		    JPFName = "VB12TPOFF"
+                    SignalType = float 
+		}
+		Signaloff36 = {
+                    SignalName = bp13ToroidalOff
+		    JPFName = "VB13TPOFF"
+                    SignalType = float 
+		}
+		Signaloff37 = {
+                    SignalName = bp14ToroidalOff
+		    JPFName = "VB14TPOFF"
+                    SignalType = float 
+		}
+		Signaloff38 = {
+                    SignalName = bp15ToroidalOff
+		    JPFName = "VB15TPOFF"
+                    SignalType = float 
+		}
+		Signaloff39 = {
+                    SignalName = bp16ToroidalOff
+		    JPFName = "VB16TPOFF"
+                    SignalType = float 
+		}
+*/
+		F1 = {
+                    SignalName = f1
+                    JPFName = "F1"
+                    SignalType = float
+                }    
+          
+		F2 = {
+                    SignalName = f2
+                    JPFName = "F1"
+                    SignalType = float
+                }    
+          
+		F3 = {
+                    SignalName = f3
+                    JPFName = "FBSC3"
+                    SignalType = float
+                }              
+		F4 = {
+                    SignalName = f4
+                    JPFName = "FBSC4"
+                    SignalType = float
+                }              
+		F5 = {
+                    SignalName = f5
+                    JPFName = "FBSC5"
+                    SignalType = float
+                }    
+          
+		F6 = {
+                    SignalName = f6
+                    JPFName = "FBSC6"
+                    SignalType = float
+                }    
+          
+		F7 = {
+                    SignalName = f7
+                    JPFName = "FBSC7"
+                    SignalType = float
+                }              
+		F8 = {
+                    SignalName = f8
+                    JPFName = "FBSC8"
+                    SignalType = float
+                }   
+
+    		RunIpPrep = {
+                    SignalName =runIpPrep
+            	    JPFName = "RUNIPPREP"
+                    SignalType = float
+                } 
+    		kfabort = {
+                    SignalName =kfabort
+            	    JPFName = "FABORT"
+                    SignalType = float
+                }
+		SignalCalc0 = {
+                    SignalName = cpt
+                    JPFName = "CPT"
+                    SignalType = int32
+                }
+		
+		SignalCalRunPlateau = {
+                    SignalName = runawayPlateau
+                    JPFName = "runawayPlateau"
+                    SignalType = int32
+                }
+
+		dVint = {
+                    SignalName =dVint
+            	    JPFName = "dip"
+                    SignalType = float
+                }
+		dtimes = {
+                    SignalName =dtimes
+            	    JPFName = "cbari"
+                    SignalType = float
+                }
+		
+
+		dREBar = {
+                    SignalName =dREBar
+            	    JPFName = "dReBar"
+                    SignalType = float
+                }
+
+
+		reVar = {
+                    SignalName =reVar
+            	    JPFName = "ReVar"
+                    SignalType = float
+                }
+
+		pidF = {
+                    SignalName =pidF
+            	    JPFName = "PIDF"
+                    SignalType = float
+                }
+		pidF2 = {
+                    SignalName =pidF2
+            	    JPFName = "PIDF2"
+                    SignalType = float
+                }
+		kpsf = {
+                    SignalName =kpsf
+            	    JPFName = "KPSF"
+                    SignalType = float
+                }
+		kpif = {
+                    SignalName =kisf
+            	    JPFName = "KISF"
+                    SignalType = float
+                }
+		kdsf = {
+                    SignalName =kdsf
+            	    JPFName = "KDSF"
+                    SignalType = float
+                }
+		exponential={
+                    SignalName =exp
+            	    JPFName = "EXP"
+                    SignalType = float
+		}
+
+		SignalCalc = {
+                    SignalName = IPL
+                    JPFName = "IPL"
+                    SignalType = float
+                }
+
+		SignalCalc14 = {
+                    SignalName = rs1
+                    JPFName = "RS1"
+                    SignalType = float
+                }
+
+		SignalCalcq14 = {
+                    SignalName = elong
+                    JPFName = "ELONG"
+                    SignalType = float
+                }
+		AWV1 = {
+                    SignalName =awv1
+                    JPFName = "AWV1"
+                    SignalType = float
+                }
+		AWV2= {
+                    SignalName =awv2
+                    JPFName = "AWV2"
+                    SignalType = float
+                }
+		AllocOut1= {
+                    SignalName =allocDeltaIf
+                    JPFName = "ADELTAIF"
+                    SignalType = float
+                }	
+		AllocOut2= {
+                    SignalName =allocDeltaIv
+                    JPFName = "ADELTAIV"
+                    SignalType = float
+                }	
+		AllocOut3= {
+                    SignalName =allocIFRef
+                    JPFName = "AIFREF"
+                    SignalType = float
+                }	
+
+		AllocOut4= {
+                    SignalName =allocVerticalFieldBalancer
+  		    JPFName = "AVBVOUT"
+                    SignalType = float
+                }	
+		
+		SignalCalc15 = {
+                    SignalName = rs2
+                    JPFName = "RS2"
+                    SignalType = float
+                }
+		
+		SignalCalc16 = {
+                    SignalName = dep
+                    JPFName = "DEP"
+                    SignalType = float
+                }
+                SignalCalc16bis = {
+                    SignalName = dez
+                    JPFName = "DEZ"
+                    SignalType = float
+                }
+   		/*SignaldezModel = {
+                    SignalName = dezModel
+                    JPFName = "DEZModel"
+                    SignalType = float
+                }*/
+		SignalCalcb16 = {
+                    SignalName = dep2
+                    JPFName = "DEP2"
+                    SignalType = float
+                }
+                SignalCalcb16bis = {
+                    SignalName = dez2
+                    JPFName = "DEZ2"
+                    SignalType = float
+                }
+		SignalCalc17 = {
+                    SignalName = z1
+                    JPFName = "Z1"
+                    SignalType = float
+                }
+		
+		SignalCalc18 = {
+                    SignalName = z2
+                    JPFName = "Z2"
+                    SignalType = float
+                }
+ 
+
+
+
+
+
+
+          /*
+		SignalCalc19 = {
+            	    SignalName = VALVE_CMD
+		    JPFName = "AVALVECMD"
+                    SignalType = float
+                }
+		SignalCalc20 = {
+            	    SignalName = SAT_FLOW_REQ
+		    JPFName = "ASAT_FLOW_REQ"
+                    SignalType = float
+                }
+                
+		SignalCalc21 = {
+            	    SignalName = NONSAT_FLOW_REQ_MB
+		    JPFName = "ANONSAT_FLOW_REQ"
+                    SignalType = float
+                }
+
+		SignalCalc22 = {
+            	    SignalName = PKR1
+		    JPFName = "APKR1"
+                    SignalType = float
+                }
+
+		SignalNoCalc23= {
+            	    SignalName = ZEROWAVE
+		    JPFName = "PKR2_BIT"
+                    SignalType = float
+                }
+        	SignalNoCalc24 = {
+            	    SignalName = ZEROWAVE
+		    JPFName = "PKR1_BIT"
+                    SignalType = float
+                }
+
+		SignalCalc25= {
+            	    SignalName = PKR2
+		    JPFName = "APKR2"
+                    SignalType = float
+                }
+		SignalCalc26 = {
+            	    SignalName = PKR2_DEN
+		    JPFName = "PKR2_DEN"
+                    SignalType = float
+                }
+
+		SignalCalc27 = {
+            	    SignalName = PKR1_DEN
+		    JPFName = "PKR1_DEN"
+                    SignalType = float
+                }
+		SignalCalc28 = {
+            	    SignalName = PREFILL_REF
+		    JPFName = "APREFILL_REF"
+                    SignalType = float
+                }
+
+		SignalCalc28b = {
+            	    SignalName = DENSITY_PLASMA_REF
+		    JPFName = "APLASMA_DENSITY"
+                    SignalType = float
+                }
+		SignalCalc29 = {
+            	    SignalName = ZEROWAVE //LMTR3T
+		    JPFName = "LMTR3T"
+                    SignalType = float
+                }
+                SignalCalc30 = {
+            	    SignalName = PREFILL_INTEGRAL_MB
+		    JPFName = "PREFILL_INTEGRAL_MB"
+                    SignalType = float
+                }
+
+ 		WavesCycleTime = {
+                    SignalName = WavesRelativeUsecTime
+	            JPFName = "WAVETIME"
+                    SignalType = float
+                }
+
+                DataGAMCycleTime={
+                    SignalName = DataGAMRelativeUsecTime
+                    JPFName = "MDSTIME"
+                    SignalType = float
+                }*/
+
+
+		SignalRifIp = {
+		     SignalName = ipRif
+                     JPFName = "FBCOR-IP"
+		     SignalType = float
+		}
+		SignalRifIf = {
+		     SignalName = ifPrep
+                     JPFName = "FVCOR-ALF"
+		     SignalType = float
+		}
+		SignalRifIv = {
+		     SignalName = ivPrep
+                     JPFName = "FVCOR-ALV"
+		     SignalType = float
+		}
+		SignalRifIh = {
+		     SignalName = ihPrep
+                     JPFName = "FVCOR-ALH"
+		     SignalType = float
+		}
+		SignalRifIt = {
+		     SignalName = itPrep
+                     JPFName = "FVCOR-ALT"
+		     SignalType = float
+		}
+
+
+		SignalRiRif = {
+		     SignalName = riRif
+                     JPFName = "RIRIF"
+		     SignalType = float
+		}
+
+		SignalReRif = {
+		     SignalName = reRif
+                     JPFName = "reRif"
+		     SignalType = float
+		}
+
+		SignalRZuif = {
+		     SignalName = zuRif
+                     JPFName = "ZURIF"
+		     SignalType = float
+		}
+
+		SignalZlRif = {
+		     SignalName = zlRif
+                     JPFName = "ZLRIF"
+		     SignalType = float
+		}
+		
+		SignalZlRif1 = {
+		     SignalName = zlRif
+                     JPFName = "ZLRIF1"
+		     SignalType = float
+		}
+		
+		SignalReRif1 = {
+		     SignalName = reRif1
+                     JPFName = "RERIF1"
+		     SignalType = float
+		}
+		SignalRif1Ip = {
+		     SignalName = ipRif1
+                     JPFName = "FBCOR-IP1"
+		     SignalType = float
+		}
+	 	SignalALH = {
+		     SignalName = ExSeek_Re_Rif
+                     JPFName = "EXSRERIF"
+		     SignalType = float
+		}
+                SignalALT = {
+        	    SignalName = ItControl
+                    JPFName = "FBCOR_ALT"
+		    SignalType = float
+		}
+	 	SignalALH = {
+		     SignalName = IhControl
+                     JPFName = "FBCOR_ALH"
+		     SignalType = float
+		}
+	 	SignalALV = {
+		     SignalName = IvControl
+                     JPFName = "FBCOR_ALV"
+		     SignalType = float
+		}
+	 	SignalALF = {
+	              SignalName = IfControl
+                      JPFName = "FBCOR_ALF"
+		      SignalType = float
+		}
+	       
+                SignalExSeek0 = {
+        	    SignalName = Delta_Re_Rif
+                    JPFName = "EXSDELTARERIF"
+		    SignalType = float
+		}	 	
+	 	SignalExSeek1 = {
+		     SignalName = ExSeek_Re_Rif
+                     JPFName = "EXSRERIF"
+		     SignalType = float
+		}
+
+		IPlasmaOn = {
+                    SignalName = IPlasmaOn
+                    JPFName = "FBCOR_ALX"
+                    SignalType = float
+                }              
+
+                Disruption = {
+                    SignalName = disruption
+                    JPFName = "disruption"
+                    SignalType = int32
+                }              
+                Runaway = {
+                    SignalName = runaway
+                    JPFName = "runaway"
+                    SignalType = int32
+                }              
+                DeIP = {
+                    SignalName = deIP
+                    JPFName = "deIP"
+                    SignalType = float
+                }        
+		 DeIPSlow = {
+                    SignalName = slowDeIP
+                    JPFName = "deIPSlow"
+                    SignalType = float
+                }              
+		 DeIPMeas = {
+                    SignalName = deIPmeas
+                    JPFName = "deIPMeas"
+                    SignalType = float
+                }              
+		DeRs2 = {
+                    SignalName = deRs2
+                    JPFName = "deRs2"
+                    SignalType = float
+                }              
+		ReRif2 = {
+                    SignalName = reRif2
+                    JPFName = "reRif2"
+                    SignalType = float
+                }              
+		 Neu = {
+                    SignalName = NEUFC02
+                    JPFName = "NEUFC02"
+                    SignalType = float
+                }          
+		 DeNeu = {
+                    SignalName = deNeu
+                    JPFName = "deNEUFC02"
+                    SignalType = float
+                }              
+                dcnbadMeas = {
+                    SignalName = dcnBadGasMeas
+                    JPFName = "dcnBadGas"
+                    SignalType = int32
+                }      
+
+                pkrbadMeas = {
+                    SignalName = pkrBadGasMeas
+                    JPFName = "pkrBadGas"
+                    SignalType = int32
+                }      
+                FBAdmBp = {
+                    SignalName = FBAdmBp
+                    JPFName = "FBADM"
+                    SignalType = float
+                }              
+			F1 = {
+                    SignalName = f1
+                    JPFName = "F1"
+                    SignalType = float
+                }    
+          
+		F2 = {
+                    SignalName = f2
+                    JPFName = "F1"
+                    SignalType = float
+                }    
+          
+		F3 = {
+                    SignalName = f3
+                    JPFName = "FBSC3"
+                    SignalType = float
+                }              
+		F4 = {
+                    SignalName = f4
+                    JPFName = "FBSC4"
+                    SignalType = float
+                }              
+		F5 = {
+                    SignalName = f5
+                    JPFName = "FBSC5"
+                    SignalType = float
+                }    
+          
+		F6 = {
+                    SignalName = f6
+                    JPFName = "FBSC6"
+                    SignalType = float
+                }    
+          
+		F7 = {
+                    SignalName = f7
+                    JPFName = "FBSC7"
+                    SignalType = float
+                }              
+		F8 = {
+                    SignalName = f8
+                    JPFName = "FBSC8"
+                    SignalType = float
+                }    
+    		RunIpPrep = {
+                    SignalName =runIpPrep
+            	    JPFName = "RUNIPPREP"
+                    SignalType = float
+                } 
+    		kfabort = {
+                    SignalName =kfabort
+            	    JPFName = "FABORT"
+                    SignalType = float
+                } 
+		fl_plasma = {
+                    SignalName =fl_plasma
+            	    JPFName = "FLPLASMA"
+                    SignalType = int32
+                } 
+		kvtabort = {
+                    SignalName =kvtabort
+            	    JPFName = "VTABORT"
+                    SignalType = float
+                }
+
+		SignalALTnew = {
+        	    SignalName = altnew
+                    JPFName = "ALT_NEW"
+		    SignalType = float
+		}
+		SignalALTxi = {
+        	    SignalName = xi
+                    JPFName = "XI"
+		    SignalType = float
+		}
+		SignalALTxir = {
+        	    SignalName = xir
+                    JPFName = "XIR"
+		    SignalType = float
+		}
+		SignalZTM = {
+        	    SignalName = ZTM_I
+                    JPFName = "ZTM=I"
+		    SignalType = float
+		}
+		SignalZFM = {
+        	    SignalName = ZFM_I
+                    JPFName = "ZFM=I"
+		    SignalType = float
+		}
+
+		SignalZFM_C = {
+        	    SignalName = ZFM_I_C
+                    JPFName = "ZFM=I_C"
+		    SignalType = float
+		}
+
+		SignalZFMRamp = {
+        	    SignalName = ZFMRamp
+                    JPFName = "ZFMRamp"
+		    SignalType = float
+		}
+		SignalALTnewr = {
+        	    SignalName = altnewr
+                    JPFName = "ALT_NEWR"
+		    SignalType = float
+		}
+		Signaldevloop = {                                                 
+	               SignalName = deVLOOP                                      
+                       SignalType = float
+                       JPFName = "DEVLOOP"                                       
+                }  
+		Signalvloop = {                                                 
+	               SignalName = VLOOP                                      
+                       SignalType = float
+                       JPFName = "VLOOP"                                       
+                } 
+
+		SignalCalcDIP= {
+                    SignalName = dIp
+                    JPFName = "DIPL"
+                    SignalType = float
+                }
+
+ 		SignalCal_IPL_SIGN= {
+                    SignalName = ipl_sign
+                    JPFName = "IPL_SIGN"
+                    SignalType = float
+                }
+
+
+		SignalCal_CQ_DETECT= {
+                    SignalName = cq_detect_output
+                    JPFName = "CQ_DETECT_OUTPUT"
+                    SignalType = float
+                }
+
+            Signal_IREF_OUTPUT = {
+                     SignalName = iref_output
+                     JPFName = "IREF_OUTPUT"
+                     SignalType = float
+            }
+
+            Signal_IP_DELTA_OUTPUT = {
+                     SignalName = deltaIpOut
+                     JPFName = "IP_DELTA_OUT"
+                     SignalType = float
+            }
+
+            Signal_IP_PWM = {
+                     SignalName = deltaIpOut_pwm
+                     JPFName = "IP_DELTA_PWM"
+                     SignalType = float
+            }
+
+            Signal_ENEBLE_PWM = {
+                     SignalName = enable_pwm
+                     JPFName = "ENABLE_PWM"
+                     SignalType = int
+            }
+            Signal_ENEBLE_DELTA_REF = {
+                     SignalName = enable_delta_ref
+                     JPFName = "ENABLE_DELTA_REF"
+                     SignalType = int
+            }
+
+            Signal_CURRENT_DELTA_REF = {
+                     SignalName = enable_current_tracking
+                     JPFName = "ENABLE_CURRENT_TRACKING"
+                     SignalType = int
+            }
+
+
+ Signal_IPLA_ERROR_OLD = {
+                     SignalName = ipl_ref_old
+                     JPFName = "IPL_REF_OLD"
+                     SignalType = float
+            }
+
+            Signal_CURRENT_DELTA_RRROR = {
+                     SignalName = ipl_error
+                     JPFName = "IPL_ERROR"
+                     SignalType = float
+            }
+
+
+
+
+            Signal_IREF_LINEAR = {
+                     SignalName = iref_linear
+                     JPFName = "IREF_LINEAR"
+                     SignalType = float
+            }
+
+            Signal_TIME = {
+                     SignalName = time
+                     JPFName = "TIME"
+                     SignalType = float
+            }
+
+          }
+
+        }
+
+ 
+       Online = "Timer DataGAM  Waves  Filters  Safety  PKREngGam1 PKREngGam2  MomentsGAM SynchOutputGAM ExtSeek LcsmGAM  InputGAM  HCircuitDezModel  Controller PreFillControl  PlasmaDensityControl SwapFlowReq FluxVoltage  SwapRef SwapDen   Collection Statistic StreamingGAM  "
+       Offline = "Timer DataGAM Waves   PKREngGam1 PKREngGam2  MomentsGAM  SynchOutputGAM PreFillControl PlasmaDensityControl Controller FluxVoltage LcsmGAM  Statistic"
+  }
+
+
+ReloadAll = 1
+}
